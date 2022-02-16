@@ -19,27 +19,23 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollDispatcher
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.istir.weebtoolscompose.ui.theme.WeebToolsComposeTheme
-import dev.chrisbanes.snapper.ExperimentalSnapperApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -52,7 +48,7 @@ class MangaViewActivity : ComponentActivity() {
         val mangaUri: Uri = Uri.parse(intent.getStringExtra("mangaUri"))
         val model: MangaViewModel by viewModels()
 
-        Log.i("mangaUri", mangaUri.toString())
+//        Log.i("mangaUri", mangaUri.toString())
         setContent {
             WeebToolsComposeTheme {
                 // A surface container using the 'background' color from the theme
@@ -221,7 +217,7 @@ fun MangaImages(bitmaps: List<Bitmap?>?) {
     var lastScrollOffset by remember { mutableStateOf(0) }
     var velocity by remember { mutableStateOf(0f) }
     var scrolling by remember { mutableStateOf(1) }
-    var page by remember { mutableStateOf(1) }
+    var page by remember { mutableStateOf(0) }
 //    val scrollState =
 //        rememberScrollableState(consumeScrollDelta = { delta ->
 //            offset += delta
@@ -229,7 +225,7 @@ fun MangaImages(bitmaps: List<Bitmap?>?) {
 //        })
     val scrollState = rememberScrollState()
 //    val scope = rememberCoroutineScope()
-    val lazyScrollState = rememberLazyListState(1)
+    val lazyScrollState = rememberLazyListState(0)
 //    lazyScrollState.per
 //    lazyScrollState.disableScrolling(scope = scope)
     var test = lazyScrollState.layoutInfo.viewportEndOffset
@@ -280,28 +276,10 @@ fun MangaImages(bitmaps: List<Bitmap?>?) {
 
 
         override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
-            Log.i("FLING", initialVelocity.toString())
 
-//            if (initialVelocity > 1000) {
-//                page += 1
-//            } else {
-//                if (page > 1)
-//                    page -= 1
-//            }
             scrolling += 1
             velocity = initialVelocity
             if (scrolling >= 10) scrolling -= 10
-//            if (Math.abs(initialVelocity) > 1000)
-//                return 1F
-//            return 0F
-//            if (initialVelocity > 1000) {
-//                val nextIndex =
-//                    if (listState.layoutInfo.totalItemsCount > listState.firstVisibleItemIndex + 1) listState.firstVisibleItemIndex + 1 else listState.layoutInfo.totalItemsCount
-//                listState.animateScrollToItem(nextIndex)
-//            }
-//            if (initialVelocity < 1000) {
-//                return 20F
-//            }
             return 20F
         }
 
@@ -309,6 +287,30 @@ fun MangaImages(bitmaps: List<Bitmap?>?) {
     }
 
     val flingBehavior = OwnFlingBehavior(page)
+
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                // we have no fling, so we're interested in the regular post scroll cycle
+                // let's try to consume what's left if we need and return the amount consumed
+//                val vertical = available.y
+//                val weConsumed = onNewDelta(vertical)
+                Log.i("connection", "consumed:$consumed,available:$available")
+                return Offset(x = available.x, y = 0f)
+
+            }
+        }
+    }
+
+
+    val nestedScrollDispatcher = remember { NestedScrollDispatcher() }
+
+
     LazyRow(
 
         state = lazyScrollState,
@@ -322,7 +324,7 @@ fun MangaImages(bitmaps: List<Bitmap?>?) {
 //                orientation = Orientation.Horizontal, state = scrollState
 //            )
             .fillMaxWidth()
-
+//            .nestedScroll(nestedScrollConnection)
 //            .offset { IntOffset(offset.roundToInt(), 0) }
             /**.pointerInput(Unit) {
             //                detectDragGestures { change,_ ->
@@ -382,14 +384,18 @@ fun MangaImages(bitmaps: List<Bitmap?>?) {
         items(bitmaps) { bitmap ->
 
             if (bitmap != null) {
-                MangaImage(bitmap = bitmap)
+                MangaImage(bitmap = bitmap, nestedScrollConnection, nestedScrollDispatcher)
             }
         }
     }
 }
 
 @Composable
-fun MangaImage(bitmap: Bitmap) {
+fun MangaImage(
+    bitmap: Bitmap,
+    nestedScrollConnection: NestedScrollConnection,
+    nestedScrollDispatcher: NestedScrollDispatcher
+) {
     val imageBitmap = bitmap.asImageBitmap()
 //  Image(bitmap)
     val zoomedScale = 2F
@@ -402,89 +408,97 @@ fun MangaImage(bitmap: Bitmap) {
     Box(
         modifier = Modifier
             .background(Color.White)
+//            .nestedScroll(nestedScrollConnection, nestedScrollDispatcher)
             .graphicsLayer(
                 scaleX = scale,
                 scaleY = scale,
 
                 )
-        /**
-        .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-        .pointerInput(scale, Unit) {
-        detectTapGestures(onDoubleTap = {
 
-        //                    scale = if (scale == 1F) 2F else 1F
-        if (scale == baseScale) {
-        offsetX = -(it.x - size.width / 2) / zoomedScale
-        offsetY = -(it.y - size.height / 2) / zoomedScale
-        //TODO: somehow make it so that new image is from top to bottom
-        setScale(zoomedScale)
-        } else {
-        //                        setTapOffset(Offset(0f, 0f))
-        //                        setOffset(Offset(0f, 0f))
-        offsetX = 0f
-        offsetY = 0f
-        setScale(baseScale)
-        }
+            .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+            .pointerInput(scale, Unit) {
+                detectTapGestures(onDoubleTap = {
 
-
-        })
-        }
-
-        .pointerInput(Unit, scale) {
+                    //                    scale = if (scale == 1F) 2F else 1F
+                    if (scale == baseScale) {
+                        offsetX = -(it.x - size.width / 2) / zoomedScale
+                        offsetY = -(it.y - size.height / 2) / zoomedScale
+                        //TODO: somehow make it so that new image is from top to bottom
+                        setScale(zoomedScale)
+                    } else {
+                        //                        setTapOffset(Offset(0f, 0f))
+                        //                        setOffset(Offset(0f, 0f))
+                        offsetX = 0f
+                        offsetY = 0f
+                        setScale(baseScale)
+                    }
 
 
-        //                detectTransformGestures(false) { centroid: Offset, pan: Offset, zoom: Float, rotation: Float ->
-        ////                    if (scale == zoomedScale) { //only if zoomed
-        //                    //TODO: save "tapped-in" offset and add (right and top) or subtract (left and bottom) centroid / size value
-        //                    setOffset(
-        //                        Offset(
-        //                            offset.x + centroid.x / size.width,
-        //                            offset.y + centroid.y / size.height
-        //                        )
-        //                    )
-        //                    Log.i(
-        //                        "offset",
-        //                        "tapOffset: $tapOffset, centroid: $centroid, size: $size, offset: $offset"
-        //                    )
-        ////                        Log.i(
-        ////                            "transform",
-        ////                            "centroid: $centroid, offset $offset, pan:$pan, zoom:$zoom, rotation:$rotation"
-        ////                        )
-        //                }
-        //                }
+                })
+            }
+
+            .pointerInput(Unit, scale) {
 
 
-        detectDragGestures { change, dragAmount ->
-        Log.i("IMAGE DRAG", "")
-        if (scale == zoomedScale) {
+                //                detectTransformGestures(false) { centroid: Offset, pan: Offset, zoom: Float, rotation: Float ->
+                ////                    if (scale == zoomedScale) { //only if zoomed
+                //                    //TODO: save "tapped-in" offset and add (right and top) or subtract (left and bottom) centroid / size value
+                //                    setOffset(
+                //                        Offset(
+                //                            offset.x + centroid.x / size.width,
+                //                            offset.y + centroid.y / size.height
+                //                        )
+                //                    )
+                //                    Log.i(
+                //                        "offset",
+                //                        "tapOffset: $tapOffset, centroid: $centroid, size: $size, offset: $offset"
+                //                    )
+                ////                        Log.i(
+                ////                            "transform",
+                ////                            "centroid: $centroid, offset $offset, pan:$pan, zoom:$zoom, rotation:$rotation"
+                ////                        )
+                //                }
+                //                }
 
-        change.consumeAllChanges()
-        val tempOffX = offsetX + dragAmount.x
-        val tempOffY = offsetY + dragAmount.y
-        val maxOffX = (-(size.width / 2) / scale)
-        val maxOffY = (-(size.height / 2) / scale)
-        //
+//  TODO: NESTED SCROLL!!!!
 
-        offsetX =
-        if (Math.abs(tempOffX) > Math.abs(maxOffX)) {
-        if (tempOffX > 0) -maxOffX else maxOffX
-        } else {
-        tempOffX
-        }
-        offsetY = if (Math.abs(tempOffY) > Math.abs(maxOffY)) {
-        if (tempOffY > 0) -maxOffY else maxOffY
-        } else {
-        tempOffY
-        }
+//                detectDragGestures { change, dragAmount ->
+//                    Log.i("IMAGE DRAG", "")
+//
+//                    if (scale == zoomedScale) {
+////pre scroll
+//                        change.consumeAllChanges()
+//                        val tempOffX = offsetX + dragAmount.x
+//                        val tempOffY = offsetY + dragAmount.y
+//                        val maxOffX = (-(size.width / 2) / scale)
+//                        val maxOffY = (-(size.height / 2) / scale)
+//                        //
+//
+//                        offsetX =
+//                            if (Math.abs(tempOffX) > Math.abs(maxOffX)) {
+//                                if (tempOffX > 0) -maxOffX else maxOffX
+//                            } else {
+//                                tempOffX
+//                            }
+//                        offsetY = if (Math.abs(tempOffY) > Math.abs(maxOffY)) {
+//                            if (tempOffY > 0) -maxOffY else maxOffY
+//                        } else {
+//                            tempOffY
+//                        }
+//// post scroll
+//                    } else {
+//                        nestedScrollDispatcher.dispatchPostScroll(
+//                            consumed = Offset(x = 0f, y = 0f),
+//                            Offset(x = size.width.toFloat(), y = 0f), //TODO: maybe change?
+//                            source = NestedScrollSource.Drag
+//                        )
+//                    }
+//                    //
+//                }
 
-        }
-        //
-        }
-        //                }
 
+            }
 
-        }
-         */
 //            .fillMaxSize()
     ) {
 //        Log.i("console.log", LocalConfiguration.current.screenLayout.)

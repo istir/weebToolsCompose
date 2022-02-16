@@ -57,6 +57,7 @@ class MangaViewModel : ViewModel() {
         this.contentResolver = contentResolver
         this.mangaUri = mangaUri
         clearItems()
+        Log.i("START MODEL", "")
 //        currentCouroutines.forEach { coroutine ->
 //            try {
 ////                coroutine.cancel("???AXD")
@@ -73,6 +74,7 @@ class MangaViewModel : ViewModel() {
 
             try {
                 CoroutineScope(Dispatchers.IO).async rt@{
+                    Log.i("START COURUTINE", "")
 //                    addCoroutine(this)
 //                    getZipSize()
                     unzipFile(this)

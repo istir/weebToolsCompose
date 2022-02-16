@@ -6,64 +6,114 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Button
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
+import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import androidx.documentfile.provider.DocumentFile
 import com.anggrayudi.storage.SimpleStorageHelper
+import com.google.accompanist.insets.LocalWindowInsets
+import com.google.accompanist.insets.ProvideWindowInsets
+import com.google.accompanist.insets.cutoutPadding
+import com.google.accompanist.insets.statusBarsPadding
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.istir.weebtoolscompose.ui.theme.WeebToolsComposeTheme
 
 class MainActivity : ComponentActivity() {
     private val storageHelper = SimpleStorageHelper(this)
     private var pickedFolder: Uri? = null //state later
-    private var choosenManga by mutableStateOf<Uri?>(null)
 
-    //    private var images: List<Bitmap?>? = null
-    var images by mutableStateOf<List<Bitmap?>?>(null)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
 
         pickedFolder = getFolderFromCache()
 
 
         setContent {
-            WeebToolsComposeTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(color = MaterialTheme.colors.background) {
-                    if (pickedFolder != null) {
-                        val folder = DocumentFile.fromTreeUri(applicationContext, pickedFolder!!)
-                        folder?.listFiles()?.let {
-                            MangaList(
-                                documentFiles = it,
-                                context = applicationContext
-                            ) { uri: Uri ->
-                                this.choosenManga = uri
+            val systemUIController = rememberSystemUiController()
+            systemUIController.setSystemBarsColor(Color.Transparent)
+            val darkTheme = isSystemInDarkTheme()
+
+            val DarkColors = darkColors(
+                primary = Color(0xffffeb46),
+                background = Color(0xff333333)
+            )
+            val LightColors = lightColors(
+                primary = Color(0xfff98880),
+                background = Color(0xffEEEEEE)
+            )
+            ProvideWindowInsets {
+                MaterialTheme(
+                    colors = if (darkTheme) DarkColors else LightColors
+                ) {
+                    // A surface container using the 'background' color from the theme
+                    Surface(
+                        color = MaterialTheme.colors.background,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth()
+                    ) {
+                        Box() {
+                            val theDp = with(LocalDensity.current) {
+                                LocalWindowInsets.current.systemBars.top.toDp()
                             }
+
+
+                            if (pickedFolder != null) {
+                                val folder =
+                                    DocumentFile.fromTreeUri(applicationContext, pickedFolder!!)
+                                folder?.listFiles()?.let {
+                                    MangaList(
+                                        documentFiles = it,
+
+                                        )
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .height(theDp)
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color(0x44000000),
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
+                            )
+                            ChooseFolderButton({ setupSimpleStorage() })
                         }
-                    }
 
 
-                    ChooseFolderButton({ setupSimpleStorage() })
-                    if (this.choosenManga != null) {
-                        val context = LocalContext.current
-                        val intent = Intent(context, MangaViewActivity::class.java)
-                        intent.putExtra("mangaUri", this.choosenManga.toString())
-                        context.startActivity(intent)
+//                    if (this.choosenManga != null) {
+//                        val context = LocalContext.current
+//                        Log.i("before intent", "")
+//                        val intent = Intent(context, MangaViewActivity::class.java)
+//                        intent.putExtra("mangaUri", this.choosenManga.toString())
+//                        context.startActivity(intent)
+////                        context.start
 //                        this.choosenManga = null
-                    }
+//                    }
 
+                    }
                 }
             }
         }
@@ -120,7 +170,7 @@ class MainActivity : ComponentActivity() {
 //}
 
 @Composable
-fun MangaList(documentFiles: Array<DocumentFile>, context: Context, onClick: (uri: Uri) -> Unit) {
+fun MangaList(documentFiles: Array<DocumentFile>) {
 //    val sortableFiles:Array<com.istir.weebtoolscompose.DocumentFile> = documentFiles as Array<com.istir.weebtoolscompose.DocumentFile>
 //    var sortedFiles = sortableFiles.sort()
 //
@@ -130,27 +180,48 @@ fun MangaList(documentFiles: Array<DocumentFile>, context: Context, onClick: (ur
 //
 //    }
     documentFiles.sortByDescending { it.lastModified() }
-    Column(Modifier.verticalScroll(rememberScrollState())) {
+    if (LocalWindowInsets.current.systemBars.top > 0) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Log.i("STATUS BAR", "${LocalWindowInsets.current.systemBars.top}")
 
-
-        for (documentFile in documentFiles) {
+            val theDp = with(LocalDensity.current) {
+                LocalWindowInsets.current.systemBars.top.toDp()
+            }
+            Box(
+                modifier = Modifier
+                    .height(theDp)
+                    .fillMaxWidth()
+            )
+            for (documentFile in documentFiles) {
 //        val documentFile = DocumentFile.fromSingleUri(context, uri)
 
-            documentFile.name?.let {
-                MangaListItem(
-                    uri = documentFile.uri,
-                    name = it,
-                    onClick = onClick
-                )
-            }
+                documentFile.name?.let {
+                    MangaListItem(
+                        uri = documentFile.uri,
+                        name = it
 
+                    )
+                }
+
+            }
         }
     }
 }
 
 @Composable
-fun MangaListItem(uri: Uri, name: String, onClick: (uri: Uri) -> Unit) {
-    Button(onClick = { onClick(uri) }, Modifier.fillMaxWidth()) {
+fun MangaListItem(uri: Uri, name: String) {
+    val context1 = LocalContext.current
+    Button(
+        onClick = {
+            val intent = Intent(context1, MangaViewActivity::class.java)
+            intent.putExtra("mangaUri", uri.toString())
+            context1.startActivity(intent)
+        },
+        Modifier
+            .fillMaxWidth()
+            .padding(15.dp)
+
+    ) {
         Text(text = name)
     }
 
@@ -159,7 +230,7 @@ fun MangaListItem(uri: Uri, name: String, onClick: (uri: Uri) -> Unit) {
 @Composable
 fun ChooseFolderButton(onClick: () -> Unit) {
 
-    Button(onClick = onClick) {
+    Button(onClick = onClick, modifier = Modifier.padding(0.dp, 200.dp, 0.dp, 0.dp)) {
         Text(text = "Choose a folder")
     }
 }
