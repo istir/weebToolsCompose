@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">weebToolsCompose</string>
+    <string name="pickedMangaFolder">NULL</string>
+    <string name="title_activity_manga_view">MangaViewActivity</string>
+</resources>
