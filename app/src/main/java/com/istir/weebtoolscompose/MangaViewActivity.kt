@@ -40,6 +40,9 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.istir.weebtoolscompose.ui.theme.WeebToolsComposeTheme
 import dev.chrisbanes.snapper.ExperimentalSnapperApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 class MangaViewActivity : ComponentActivity() {
@@ -85,21 +88,22 @@ fun MangaImages(
 
 }
 
-private val VerticalScrollConsumer = object : NestedScrollConnection {
-    override fun onPreScroll(available: Offset, source: NestedScrollSource) = available.copy(x = 0f)
-    override suspend fun onPreFling(available: Velocity) = available.copy(x = 0f)
+fun LazyListState.disableScrolling(scope: CoroutineScope) {
+    scope.launch {
+        scroll(scrollPriority = androidx.compose.foundation.MutatePriority.PreventUserInput) {
+            // Await indefinitely, blocking scrolls
+            awaitCancellation()
+        }
+    }
 }
 
-private val HorizontalScrollConsumer = object : NestedScrollConnection {
-    override fun onPreScroll(available: Offset, source: NestedScrollSource) = available.copy(y = 0f)
-    override suspend fun onPreFling(available: Velocity) = available.copy(y = 0f)
+fun LazyListState.reenableScrolling(scope: CoroutineScope) {
+    scope.launch {
+        scroll(scrollPriority = androidx.compose.foundation.MutatePriority.PreventUserInput) {
+            // Do nothing, just cancel the previous indefinite "scroll"
+        }
+    }
 }
-
-fun Modifier.disabledVerticalPointerInputScroll(disabled: Boolean = true) =
-    if (disabled) this.nestedScroll(VerticalScrollConsumer) else this
-
-fun Modifier.disabledHorizontalPointerInputScroll(disabled: Boolean = true) =
-    if (disabled) this.nestedScroll(HorizontalScrollConsumer) else this
 
 //@SuppressLint("CoroutineCreationDuringComposition")
 //@OptIn(ExperimentalMaterialApi::class)
@@ -118,7 +122,7 @@ fun MangaImages(bitmaps: List<Bitmap?>?) {
 //        Log.i("lastOffset", listState.layoutInfo.viewportEndOffset.toString())
 //        Log.i("currentIndex", listState.firstVisibleItemIndex.toString())
 //        Log.i("src", listState.interactionSource.toString())
-
+        Log.i("", "${listState.firstVisibleItemScrollOffset}")
         val offset = listState.firstVisibleItemScrollOffset
         val maxOffset = listState.layoutInfo.viewportEndOffset
         val offsetToScrollToNext = maxOffset / 2
@@ -142,27 +146,6 @@ fun MangaImages(bitmaps: List<Bitmap?>?) {
 //    }
 //listState.item
 
-    class OwnFlingBehavior : FlingBehavior {
-        override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
-            Log.i("FLING", initialVelocity.toString())
-//            if (Math.abs(initialVelocity) > 1000)
-//                return 1F
-//            return 0F
-//            if (initialVelocity > 1000) {
-//                val nextIndex =
-//                    if (listState.layoutInfo.totalItemsCount > listState.firstVisibleItemIndex + 1) listState.firstVisibleItemIndex + 1 else listState.layoutInfo.totalItemsCount
-//                listState.animateScrollToItem(nextIndex)
-//            }
-//            if (initialVelocity < 1000) {
-//                return 20F
-//            }
-            return 20F
-        }
-
-
-    }
-
-    val flingBehavior = OwnFlingBehavior()
 
 //    LazyRow(
 //        state = listState,
@@ -235,79 +218,160 @@ fun MangaImages(bitmaps: List<Bitmap?>?) {
     var isDragging by remember { mutableStateOf(false) }
     var startPosX by remember { mutableStateOf(0f) }
     var draggingTime by remember { mutableStateOf(0) }
-    var offset by remember { mutableStateOf(0f) }
-    val scrollState =
-        rememberScrollableState(consumeScrollDelta = { delta ->
-            offset += delta
-            delta
-        })
-    val lazyScrollState = rememberLazyListState()
-    LaunchedEffect(key1 = offset, key2 = lazyScrollState.isScrollInProgress, block = {
+    var lastScrollOffset by remember { mutableStateOf(0) }
+    var velocity by remember { mutableStateOf(0f) }
+    var scrolling by remember { mutableStateOf(1) }
+    var page by remember { mutableStateOf(1) }
+//    val scrollState =
+//        rememberScrollableState(consumeScrollDelta = { delta ->
+//            offset += delta
+//            delta
+//        })
+    val scrollState = rememberScrollState()
+//    val scope = rememberCoroutineScope()
+    val lazyScrollState = rememberLazyListState(1)
+//    lazyScrollState.per
+//    lazyScrollState.disableScrolling(scope = scope)
+    var test = lazyScrollState.layoutInfo.viewportEndOffset
+    LaunchedEffect(scrolling) {
 //        val test = scrollState.scrollBy(off)
 //        val test = scrollState.scrollTo(200)
 //        Log.i("launched", "effect, $test")
 //        lazyScrollState.stopScroll()
 
-        lazyScrollState.scrollBy(200F)
-    })
+        Log.i(
+            "inter",
+            "firstVisibleScrollOffset: ${lazyScrollState.firstVisibleItemScrollOffset},page: $page,currentIndex: ${lazyScrollState.firstVisibleItemIndex},  lastOffset: ${lazyScrollState.layoutInfo.viewportEndOffset}"
+
+        )
+//        if (lazyScrollState.firstVisibleItemScrollOffset > lazyScrollState.layoutInfo.viewportEndOffset / 2) {
+//            page += 1
+//            Log.i("MOVE", "")
+//        }
+//        lastScrollOffset = lazyScrollState.firstVisibleItemScrollOffset
 
 
+        if (velocity > 1000 || (lazyScrollState.firstVisibleItemIndex >= page && (lazyScrollState.firstVisibleItemScrollOffset > lazyScrollState.layoutInfo.viewportEndOffset / 2.5))) {
+            Log.i("page", "++")
+            if (page < lazyScrollState.layoutInfo.totalItemsCount) {
+                page += 1
+            }
+        } else if (velocity < -1000 || (lazyScrollState.firstVisibleItemIndex < page && (lazyScrollState.firstVisibleItemScrollOffset > lazyScrollState.layoutInfo.viewportEndOffset / 2.5))) {
+            if (page >= 1) {
+                Log.i("page", "--")
+                page -= 1
+            }
+
+        }
+        lazyScrollState.animateScrollToItem(page)
+//        lastScrollOffset = lazyScrollState.firstVisibleItemScrollOffset
+//        listState.animateScrollToItem(listState.firstVisibleItemIndex)
+
+
+//        lazyScrollState.scrollBy(200F)
+    }
+//lazyScrollState.
+
+    class OwnFlingBehavior : FlingBehavior {
+
+        private var page: Int = page
+
+        constructor(page: Int)
+
+
+        override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
+            Log.i("FLING", initialVelocity.toString())
+
+//            if (initialVelocity > 1000) {
+//                page += 1
+//            } else {
+//                if (page > 1)
+//                    page -= 1
+//            }
+            scrolling += 1
+            velocity = initialVelocity
+            if (scrolling >= 10) scrolling -= 10
+//            if (Math.abs(initialVelocity) > 1000)
+//                return 1F
+//            return 0F
+//            if (initialVelocity > 1000) {
+//                val nextIndex =
+//                    if (listState.layoutInfo.totalItemsCount > listState.firstVisibleItemIndex + 1) listState.firstVisibleItemIndex + 1 else listState.layoutInfo.totalItemsCount
+//                listState.animateScrollToItem(nextIndex)
+//            }
+//            if (initialVelocity < 1000) {
+//                return 20F
+//            }
+            return 20F
+        }
+
+
+    }
+
+    val flingBehavior = OwnFlingBehavior(page)
     LazyRow(
 
-//        state = lazyScrollState,
-        verticalAlignment = Alignment.CenterVertically,
+        state = lazyScrollState,
+//        verticalAlignment = Alignment.CenterVertically,
+        flingBehavior = flingBehavior,
         modifier = Modifier
-            .disabledVerticalPointerInputScroll()
-            .disabledVerticalPointerInputScroll()
+
 //            .horizontalScroll(rememberScrollState())
 //
 //            .scrollable(
 //                orientation = Orientation.Horizontal, state = scrollState
 //            )
             .fillMaxWidth()
-//            .offset { IntOffset(offset.roundToInt(), 0) }
-            .pointerInput(Unit) {
-//                detectDragGestures { change,_ ->
-//                    //if change is big then it's fast
-//                    //---
-//                    // iter = historical.length
-//                    
-//                val velocity = change.positionChange()
-//                    Log.i("DRAGGING", "iter: ${}, positionChange: ${change.positionChange()},change:$change")
-//                }
-                detectDragGestures({
-                    Log.i("DRAG", "START")
-                    isDragging = true
-                    startPosX = it.x
-                    draggingTime = 1
-                },
-                    {
-                        Log.i("DRAG", "END")
-                        isDragging = false
-                        startPosX = 0f
-                        draggingTime = 0
-                    },
-                    {
-                        Log.i("DRAG", "CANCEL")
-                        isDragging = false
-                        startPosX = 0f
-                        draggingTime = 0
-                    },
-                    { change: PointerInputChange, dragAmount: Offset ->
-                        val distance = startPosX - change.position.x
 
-                        val time = draggingTime
-                        val velocity = distance / time
-//                        offset += dragAmount.x
-                        Log.i("DRAG", "velocity: $velocity, dragging: $isDragging, change: $change")
-//                        scrollState = rememberScrollState()
-//                        scrollState.value += dragAmount.x.roundToInt()
-//                        scrollState.scroll {  }
-                        //if velocity > X then change page to +=1?
-                        //else change only after drag distance is more than half the screen
-                        draggingTime += 1
-                    })
+//            .offset { IntOffset(offset.roundToInt(), 0) }
+            /**.pointerInput(Unit) {
+            //                detectDragGestures { change,_ ->
+            //                    //if change is big then it's fast
+            //                    //---
+            //                    // iter = historical.length
+            //
+            //                val velocity = change.positionChange()
+            //                    Log.i("DRAGGING", "iter: ${}, positionChange: ${change.positionChange()},change:$change")
+            //                }
+
+            detectDragGestures({
+            Log.i("DRAG", "START")
+            isDragging = true
+            startPosX = it.x
+            draggingTime = 1
+            },
+            {
+            Log.i("DRAG", "END")
+            isDragging = false
+            startPosX = 0f
+            draggingTime = 0
+            },
+            {
+            Log.i("DRAG", "CANCEL")
+            isDragging = false
+            startPosX = 0f
+            draggingTime = 0
+            },
+            { change: PointerInputChange, dragAmount: Offset ->
+            val distance = startPosX - change.position.x
+
+            val time = draggingTime
+            val velocity = distance / time
+            //                        offset += dragAmount.x
+            Log.i("DRAG", "velocity: $velocity, dragging: $isDragging, change: $change")
+            //                        scrollState = rememberScrollState()
+            //                        scrollState.value += dragAmount.x.roundToInt()
+            //                        scrollState.scroll {  }
+            Log.i("velocity", "$velocity")
+            if (velocity > 10) {
+            Log.i("PAGE", "$page")
+            page += 1
             }
+            //if velocity > X then change page to +=1?
+            //else change only after drag distance is more than half the screen
+            draggingTime += 1
+            })
+            }*/
             .background(Color.Red)
     ) {
 //        Log.i("console.log", offset.toString())
