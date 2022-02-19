@@ -14,6 +14,7 @@
             android:exported="false"
             android:label="@string/title_activity_manga_view"
             android:theme="@style/Theme.WeebToolsCompose" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -30,7 +30,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.istir.weebtoolscompose.ui.theme.WeebToolsComposeTheme
 import kotlin.math.roundToInt
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -39,7 +38,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Velocity
 import androidx.core.view.WindowCompat
-import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.ProvideWindowInsets
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
@@ -76,7 +74,7 @@ class MangaViewActivity : ComponentActivity() {
                         color = MaterialTheme.colors.background
                     ) {
 //                    Greeting2("Android")
-                        MangaImages(
+                        MangaImagesOld(
                             mangaViewModel = model,
                             choosenManga = mangaUri,
                             contentResolver = contentResolver,
@@ -91,7 +89,7 @@ class MangaViewActivity : ComponentActivity() {
 
 
 @Composable
-fun MangaImages(
+fun MangaImagesOld(
     mangaViewModel: MangaViewModel,
     choosenManga: Uri,
     contentResolver: ContentResolver,
@@ -102,7 +100,7 @@ fun MangaImages(
 
     mangaViewModel.init(contentResolver = contentResolver, mangaUri = choosenManga)
 
-    MangaImages(bitmaps = mangaViewModel.items, zoomedImagesModel = zoomedImagesModel)
+    MangaImagesOld(bitmaps = mangaViewModel.items, zoomedImagesModel = zoomedImagesModel)
 
 }
 
@@ -111,7 +109,7 @@ fun MangaImages(
 //@OptIn(ExperimentalMaterialApi::class)
 //@OptIn(ExperimentalSnapperApi::class)
 @Composable
-fun MangaImages(bitmaps: List<Bitmap?>?, zoomedImagesModel: MangaViewZoomedImagesModel) {
+fun MangaImagesOld(bitmaps: List<Bitmap?>?, zoomedImagesModel: MangaViewZoomedImagesModel) {
 //    var offset by remember { mutableStateOf(0f) }
     if (bitmaps == null) return
 //    val listState = rememberLazyListState()
@@ -307,8 +305,37 @@ fun MangaImages(bitmaps: List<Bitmap?>?, zoomedImagesModel: MangaViewZoomedImage
 
     val nestedScrollDispatcher = remember { NestedScrollDispatcher() }
 
+    LaunchedEffect(lazyScrollState.firstVisibleItemIndex) {
+        zoomedImagesModel.currentImageScale = 1f
+        zoomedImagesModel.draggingOverboard = false
+        zoomedImagesModel.canChangePageWhileZoomedRight = false
+//        zoomedImagesModel.canChangePageWhileZoomedLeft = false //? idk this fixes things
+//        Log.i(
+//            "PAGE",
+//            "first index: ${lazyScrollState.firstVisibleItemIndex}, page: ${zoomedImagesModel.page}, bool1:${lazyScrollState.firstVisibleItemIndex <= zoomedImagesModel.page},bool2: ${(lazyScrollState.firstVisibleItemScrollOffset > lazyScrollState.layoutInfo.viewportEndOffset / (2.5 * zoomedImagesModel.currentImageScale))}, curr: ${lazyScrollState.firstVisibleItemScrollOffset},val: ${lazyScrollState.layoutInfo.viewportEndOffset / (2.5 * zoomedImagesModel.currentImageScale)}, bool: ${(lazyScrollState.firstVisibleItemIndex <= zoomedImagesModel.page && (lazyScrollState.firstVisibleItemScrollOffset > lazyScrollState.layoutInfo.viewportEndOffset / (2.5 * zoomedImagesModel.currentImageScale)))}"
+//        )
+//        if (lazyScrollState.firstVisibleItemScrollOffset <= 0) {
+//            if ((velocity > 800 && zoomedImagesModel.currentImageScale == 1f) || (lazyScrollState.firstVisibleItemIndex <= zoomedImagesModel.page && (lazyScrollState.firstVisibleItemScrollOffset > lazyScrollState.layoutInfo.viewportEndOffset / (2.5 * zoomedImagesModel.currentImageScale)))) {
+//                Log.i("velocity", "OK")
+//                if (zoomedImagesModel.page >= 1 && zoomedImagesModel.page >= zoomedImagesModel.scrollStartPage) {
+//                    Log.i("page", "--")
+//                    zoomedImagesModel.page -= 1
+////                zoomedImagesModel.currentImageScale = 1f
+//                }
+//
+//            }
+//            Log.i("changed page", "${lazyScrollState.firstVisibleItemScrollOffset}")
+//        }
 
-    LaunchedEffect(scrolling, zoomedImagesModel.scrollingHack) {
+
+    }
+
+    LaunchedEffect(scrolling, zoomedImagesModel.scrollingHack, zoomedImagesModel.page) {
+        Log.i(
+            "SCROLLINGHACK",
+            "${zoomedImagesModel.scrollingHack}, isscroll: ${lazyScrollState.isScrollInProgress}"
+        )
+//        if (lazyScrollState.isScrollInProgress) return@LaunchedEffect
 //        val test = scrollState.scrollBy(off)
 //        val test = scrollState.scrollTo(200)
 //        zoomedImagesModel.stopScrollFromUpdating()
@@ -343,9 +370,12 @@ fun MangaImages(bitmaps: List<Bitmap?>?, zoomedImagesModel: MangaViewZoomedImage
 //        }
 //        lastScrollOffset = lazyScrollState.firstVisibleItemScrollOffset
 
-
-        if (velocity < -800 || (lazyScrollState.firstVisibleItemIndex >= zoomedImagesModel.page && (lazyScrollState.firstVisibleItemScrollOffset > lazyScrollState.layoutInfo.viewportEndOffset / 2.5))) {
-
+        Log.i(
+            "PAGE",
+            "firstItemOffset: ${lazyScrollState.firstVisibleItemScrollOffset}, viewportOffset: ${lazyScrollState.layoutInfo.viewportEndOffset}, viewportOffsetDivided: ${lazyScrollState.layoutInfo.viewportEndOffset / (2.5 * zoomedImagesModel.currentImageScale)}"
+        )
+        if ((velocity < -800 && zoomedImagesModel.currentImageScale == 1f) || (lazyScrollState.firstVisibleItemIndex >= zoomedImagesModel.page && (lazyScrollState.firstVisibleItemScrollOffset > lazyScrollState.layoutInfo.viewportEndOffset / (2.5 * zoomedImagesModel.currentImageScale)))) {
+//TODO: this if bad
             Log.i("velocity", "OK")
             if (zoomedImagesModel.page < lazyScrollState.layoutInfo.totalItemsCount && zoomedImagesModel.page <= (zoomedImagesModel.scrollStartPage)) {
                 Log.i(
@@ -353,18 +383,27 @@ fun MangaImages(bitmaps: List<Bitmap?>?, zoomedImagesModel: MangaViewZoomedImage
                     "++"
                 )
                 zoomedImagesModel.page += 1
+
             }
-        } else if (velocity > 800 || (lazyScrollState.firstVisibleItemIndex < zoomedImagesModel.page && (lazyScrollState.firstVisibleItemScrollOffset < lazyScrollState.layoutInfo.viewportEndOffset / 2.5))) {
+        } else if ((velocity > 800 && zoomedImagesModel.currentImageScale == 1f) || (lazyScrollState.firstVisibleItemIndex < zoomedImagesModel.page && (lazyScrollState.firstVisibleItemScrollOffset < lazyScrollState.layoutInfo.viewportEndOffset - lazyScrollState.layoutInfo.viewportEndOffset / (2.5 * zoomedImagesModel.currentImageScale)))) {
             Log.i("velocity", "OK")
             if (zoomedImagesModel.page >= 1 && zoomedImagesModel.page >= zoomedImagesModel.scrollStartPage) {
                 Log.i("page", "--")
                 zoomedImagesModel.page -= 1
+//                zoomedImagesModel.currentImageScale = 1f
             }
 
         }
 //        zoomedImagesModel.page = page
+
         lazyScrollState.animateScrollToItem(zoomedImagesModel.page)
+//        zoomedImagesModel.updateAfterScroll()
+
+//        zoomedImagesModel.currentImageScale = 1f
         Log.i("AFTER SCROLL", "${lazyScrollState.firstVisibleItemScrollOffset}")
+//        zoomedImagesModel.draggingOverboard = false
+//        zoomedImagesModel.canChangePageWhileZoomedRight = false
+//        zoomedImagesModel.canChangePageWhileZoomedLeft = false
 //        zoomedImagesModel.letScrollUpdate()
 //        } else {
 //            lazyScrollState.dispatchRawDelta(0f)
@@ -421,6 +460,11 @@ fun MangaImages(bitmaps: List<Bitmap?>?, zoomedImagesModel: MangaViewZoomedImage
         zoomedImagesModel.currentListOffsetX = lazyScrollState.firstVisibleItemScrollOffset
         lazyScrollState.scrollBy(-zoomedImagesModel.listOffset)
         Log.i("AFTER SCROLL2", "${lazyScrollState.firstVisibleItemScrollOffset}")
+        if (lazyScrollState.firstVisibleItemScrollOffset == 0) {
+            zoomedImagesModel.draggingOverboard = false
+            zoomedImagesModel.canChangePageWhileZoomedRight = false
+            zoomedImagesModel.canChangePageWhileZoomedLeft = false
+        }
         zoomedImagesModel.refreshScrollIfNeeded()
 //        }
 
@@ -599,7 +643,7 @@ fun MangaImages(bitmaps: List<Bitmap?>?, zoomedImagesModel: MangaViewZoomedImage
 
             if (bitmap != null) {
 
-                MangaImage(
+                MangaImageOld(
                     bitmap = bitmap,
                     nestedScrollConnection,
                     nestedScrollDispatcher,
@@ -613,7 +657,7 @@ fun MangaImages(bitmaps: List<Bitmap?>?, zoomedImagesModel: MangaViewZoomedImage
 }
 
 @Composable
-fun MangaImage(
+fun MangaImageOld(
     bitmap: Bitmap,
     nestedScrollConnection: NestedScrollConnection,
     nestedScrollDispatcher: NestedScrollDispatcher,
@@ -670,18 +714,29 @@ fun MangaImage(
                         offsetY = -(it.y - size.height / 2) / zoomedScale
                         //TODO: somehow make it so that new image is from top to bottom
 //                        zoomedItems.add(indexOf)
+
+                        Log.i("ZOOM OFFSET", "${offsetX}, ${offsetY}")
+//w.e
+                        zoomedImagesModel.draggingOverboard = false
+                        zoomedImagesModel.canChangePageWhileZoomedRight = false
+                        zoomedImagesModel.canChangePageWhileZoomedLeft = false
                         zoomedImagesModel.isDraggingSmall = true
                         zoomedImagesModel.addItem(indexOf)
                         setScale(zoomedScale)
+                        zoomedImagesModel.currentImageScale = zoomedScale
                     } else {
                         //                        setTapOffset(Offset(0f, 0f))
                         //                        setOffset(Offset(0f, 0f))
                         offsetX = 0f
                         offsetY = 0f
+                        zoomedImagesModel.draggingOverboard = false
+                        zoomedImagesModel.canChangePageWhileZoomedRight = false
+                        zoomedImagesModel.canChangePageWhileZoomedLeft = false
                         zoomedImagesModel.isDraggingSmall = false
 //                        zoomedItems.remove(indexOf)
                         zoomedImagesModel.removeItem(indexOf)
                         setScale(baseScale)
+                        zoomedImagesModel.currentImageScale = baseScale
                     }
 
 
@@ -727,13 +782,22 @@ fun MangaImage(
 
                     onDragCancel = { Log.i("CANCEL", "") },
                     onDragEnd = {
-                        Log.i("END", "")
+                        Log.i(
+                            "END",
+                            "edge Right:${zoomedImagesModel.imageDraggedToEdgesRight}, edge left: ${zoomedImagesModel.imageDraggedToEdgesLeft}"
+                        )
+                        zoomedImagesModel.canChangePageWhileZoomedRight =
+                            zoomedImagesModel.imageDraggedToEdgesRight
+                        zoomedImagesModel.canChangePageWhileZoomedLeft =
+                            zoomedImagesModel.imageDraggedToEdgesLeft
                         zoomedImagesModel.refreshScrolling()
                         zoomedImagesModel.letScrollUpdate()
                         zoomedImagesModel.isScrolling = false
                         zoomedImagesModel.timeChanged = zoomedImagesModel.time
+
                     },
                     onDrag = { change, dragAmount ->
+                        zoomedImagesModel.currentImageScale = scale
 //                        val tempOffX = offsetX + dragAmount.x
                         zoomedImagesModel.time += change.uptimeMillis
                         zoomedImagesModel.currentImageOffsetX = offsetX + (dragAmount.x)
@@ -749,12 +813,73 @@ fun MangaImage(
                         val maxOffY = (-(size.height / 2) / scale)
                         Log.i(
                             "IMAGE DRAG",
-                            "${change.uptimeMillis}"
+                            "${zoomedImagesModel.currentImageOffsetX}, ${zoomedImagesModel.maxImageOffsetX}, canChangeRight: ${zoomedImagesModel.canChangePageWhileZoomedRight}, ${
+                                Math.abs(zoomedImagesModel.currentImageOffsetX) >= Math.abs(
+                                    zoomedImagesModel.maxImageOffsetX
+                                )
+                            }"
                         )
 
-//TODO: somehow make it so shouldChangePagesZoomed controls if scrolls
-                        if (scale > baseScale) {
 
+                        //if scale > base Scale
+                        //  if currentImageOffsetX >= maxImageOffsetX
+                        //      if canChangePagesWhileZoomed
+
+//                        var shouldDrag = false
+
+                        var shouldDrag = if (scale > baseScale) {
+                            Log.i("IMAGE", "1st if, ${zoomedImagesModel.currentImageOffsetX}")
+                            //LEFT
+
+                            if (zoomedImagesModel.currentImageOffsetX >= Math.abs(zoomedImagesModel.maxImageOffsetX)) {
+                                Log.i(
+                                    "IMAGE LEFT",
+                                    "2nd if, ${!zoomedImagesModel.canChangePageWhileZoomedLeft}"
+                                )
+                                !zoomedImagesModel.canChangePageWhileZoomedLeft
+                            } else if (zoomedImagesModel.currentImageOffsetX <=
+                                zoomedImagesModel.maxImageOffsetX
+                            ) {
+                                Log.i(
+                                    "IMAGE RIGHT",
+                                    "2nd if, ${!zoomedImagesModel.canChangePageWhileZoomedRight}"
+                                )
+                                !zoomedImagesModel.canChangePageWhileZoomedRight
+                            } else {
+                                Log.i("IMAGE RIGHT", "1st else")
+                                if (zoomedImagesModel.draggingOverboard) {
+                                    Log.i("IMAGE RIGHT", "3rd if")
+                                    false
+                                } else {
+                                    Log.i("IMAGE RIGHT", "3rd else")
+                                    true
+                                }
+                            }
+                            //END RIGHT
+                        } else {
+                            Log.i("IMAGE", "2nd else")
+                            false
+                        }
+
+//                        else {
+//                        Log.i("IMAGE LEFT", "1st else")
+//                        if (zoomedImagesModel.draggingOverboard) {
+//                            Log.i("IMAGE LEFT", "3rd if")
+//                            false
+//                        } else {
+//                            Log.i("IMAGE LEFT", "3rd else")
+//                            true
+//                        }
+//                    }
+
+                        //END LEFT
+
+
+                        //RIGHT
+
+//TODO: somehow make it so shouldChangePagesZoomed controls if scrolls
+//                        if (scale > baseScale) {
+                        if (shouldDrag) {
 //                        if (scale > baseScale && Math.abs(zoomedImagesModel.currentImageOffsetX) <= Math.abs(
 //                                zoomedImagesModel.maxImageOffsetX
 //                            )
@@ -766,13 +891,14 @@ fun MangaImage(
 //                            ))
 //                        ) {
 //pre scroll
+                            /*
                             if (zoomedImagesModel.draggingOverboard) {
                                 zoomedImagesModel.overboardOffset = dragAmount.x
                                 zoomedImagesModel.refreshScrollingBack()
 
                             }
-
-                            zoomedImagesModel.setOffset(0f)
+    */
+//                            zoomedImagesModel.setOffset(0f)
                             Log.i("scale", "in scale")
 //                        val parentConsumed = nestedScrollDispatcher.dispatchPreScroll(
 //                            available = Offset(
@@ -786,14 +912,27 @@ fun MangaImage(
 
                             //
 
+//                                    && !zoomedImagesModel.canChangePageWhileZoomed TODO
                             offsetX =
                                 if (Math.abs(zoomedImagesModel.currentImageOffsetX) > Math.abs(
                                         zoomedImagesModel.maxImageOffsetX
                                     )
                                 ) {
-                                    if (zoomedImagesModel.currentImageOffsetX > 0) -zoomedImagesModel.maxImageOffsetX else zoomedImagesModel.maxImageOffsetX
+                                    if (zoomedImagesModel.currentImageOffsetX > 0) {
+                                        -zoomedImagesModel.maxImageOffsetX.also {
+                                            zoomedImagesModel.imageDraggedToEdgesLeft = true
+                                            zoomedImagesModel.imageDraggedToEdgesRight = false
+                                        }
+
+                                    } else zoomedImagesModel.maxImageOffsetX.also {
+                                        zoomedImagesModel.imageDraggedToEdgesRight = true
+                                        zoomedImagesModel.imageDraggedToEdgesLeft = false
+                                    }
                                 } else {
-                                    zoomedImagesModel.currentImageOffsetX
+                                    zoomedImagesModel.currentImageOffsetX.also {
+                                        zoomedImagesModel.imageDraggedToEdgesRight = false
+                                        zoomedImagesModel.imageDraggedToEdgesLeft = false
+                                    }
                                 }
                             offsetY = if (Math.abs(tempOffY) > Math.abs(maxOffY)) {
                                 if (tempOffY > 0) -maxOffY else maxOffY

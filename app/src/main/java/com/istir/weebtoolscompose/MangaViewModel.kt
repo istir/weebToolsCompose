@@ -21,6 +21,8 @@ class MangaViewModel : ViewModel() {
     lateinit var contentResolver: ContentResolver
     lateinit var mangaUri: Uri
 
+
+
     //    val currentCouroutines: ArrayList<Deferred<Unit>> = ArrayList()
     val currentCouroutines: ArrayList<CoroutineScope> = ArrayList()
 //    var currentCouroutines = mutableStateListOf<CoroutineScope>()

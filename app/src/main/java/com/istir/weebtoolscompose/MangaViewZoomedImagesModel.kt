@@ -5,7 +5,29 @@ import androidx.lifecycle.ViewModel
 
 class MangaViewZoomedImagesModel : ViewModel() {
 
-    var shouldChangePagesZoomed by mutableStateOf(false)
+    var statusBarVisible by mutableStateOf(false)
+
+
+    //--------------------- OLD
+    var shouldChangePagesZoomed by mutableStateOf(false) //on/off switch
+
+    var canChangePageWhileZoomedRight by mutableStateOf(false)
+    var imageDraggedToEdgesRight by mutableStateOf(false)
+    var canChangePageWhileZoomedLeft by mutableStateOf(false)
+    var imageDraggedToEdgesLeft by mutableStateOf(false)
+
+    var currentImageScale by mutableStateOf(
+        1f
+    )
+
+    var afterScroll by mutableStateOf(0)
+    fun updateAfterScroll() {
+        if (afterScroll >= 10) {
+            afterScroll = 0
+        } else {
+            afterScroll += 1
+        }
+    }
 
     var time by mutableStateOf<Long>(0)
     var timeChanged by mutableStateOf<Long>(0)
