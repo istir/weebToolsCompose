@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val systemUIController = rememberSystemUiController()
             systemUIController.setSystemBarsColor(Color.Transparent)
+
             val darkTheme = isSystemInDarkTheme()
 
             val DarkColors = darkColors(
