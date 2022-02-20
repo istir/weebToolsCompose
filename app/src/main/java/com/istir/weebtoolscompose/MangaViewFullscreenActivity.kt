@@ -3,20 +3,24 @@ package com.istir.weebtoolscompose
 import androidx.appcompat.app.AppCompatActivity
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.util.Log
-import android.view.MotionEvent
-import android.view.View
-import android.view.WindowInsets
-import android.view.WindowManager
+import android.view.*
+import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
+import com.google.accompanist.insets.LocalWindowInsets
 import com.istir.weebtoolscompose.databinding.ActivityMangaViewFullscreenBinding
 
 /**
@@ -26,33 +30,52 @@ import com.istir.weebtoolscompose.databinding.ActivityMangaViewFullscreenBinding
 class MangaViewFullscreenActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMangaViewFullscreenBinding
-    private lateinit var fullscreenContent: TextView
+    private lateinit var fullscreenContent: LinearLayout
     private lateinit var imageView: SubsamplingScaleImageView
     private val mangaViewModel: MangaViewModel by viewModels()
     private val hideHandler = Handler()
 
     @SuppressLint("InlinedApi")
+
+
     private val hidePart2Runnable = Runnable {
         // Delayed removal of status and navigation bar
-        if (Build.VERSION.SDK_INT >= 30) {
-            fullscreenContent.windowInsetsController?.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
         } else {
-            // Note that some of these constants are new as of API 16 (Jelly Bean)
-            // and API 19 (KitKat). It is safe to use them, as they are inlined
-            // at compile-time and do nothing on earlier devices.
-            fullscreenContent.systemUiVisibility =
-                View.SYSTEM_UI_FLAG_LOW_PROFILE or
-                        View.SYSTEM_UI_FLAG_FULLSCREEN or
-                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    // Hide the nav bar and status bar
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_FULLSCREEN)
         }
     }
     private val showPart2Runnable = Runnable {
         // Delayed display of UI elements
-        supportActionBar?.show()
+        if (Build.VERSION.SDK_INT >= 30) {
+//            Log.i("API", ">")
+//    fullscreenContent.windowInsetsController?.show(WindowInsets.Type.)
+//            window.insetsController.
+            fullscreenContent.windowInsetsController?.show(WindowInsets.Type.systemBars())
+//            fullscreenContent.windowInsetsController?.show(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+        } else {
+//            fullscreenContent.systemUiVisibility = View.System_UI_FLAG_
+
+
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        }
+//        supportActionBar?.show()
 //        fullscreenContentControls.visibility = View.VISIBLE
+
     }
     private var isFullscreen: Boolean = false
 
@@ -81,16 +104,46 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
 
         binding = ActivityMangaViewFullscreenBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+//        window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS) //TODO???
+//        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
         val attrib = window.attributes
-        attrib.layoutInDisplayCutoutMode =
-            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        val h = resources.getDimensionPixelOffset(
+            resources.getIdentifier(
+                "status_bar_height",
+                "dimen",
+                "android"
+            )
+        )
 
+        if (h > 0) {
+//            val layoutParams = binding.floatingBar.layoutParams
+//            binding.floatingBar.height
+//            Log.i("HEIGHT", "${layoutParams.height}, ${binding.floatingBar.measuredHeightAndState}")
+//            layoutParams.height += h
+//            layoutParams.pa
+            binding.floatingBar.setPadding(0, h, 0, 0)
+//            binding.floatingBar.layoutParams = layoutParams
+        }
+        Log.i("height", "h:${h}")
+        attrib.layoutInDisplayCutoutMode =
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+//        WindowCompat.setDecorFitsSystemWindows(window, false)
+//
+
+//        window.setDecorFitsSystemWindows(false)
+//        window.insetsController?.let {
+//            it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+//            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+//        }
+//        actionBar?.hide()
+        supportActionBar?.hide()
         isFullscreen = true
 
         // Set up the user interaction to manually show or hide the system UI.
-        fullscreenContent = binding.fullscreenContent
+        fullscreenContent = binding.linearLayout
         fullscreenContent.setOnClickListener { toggle() }
 
         val mangaUri: Uri = Uri.parse(intent.getStringExtra("mangaUri"))
@@ -128,7 +181,8 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
 //        mangaViewModel.init(contentResolver = contentResolver, mangaUri = mangaUri)
         mangaViewModel.initLiveData(contentResolver = contentResolver, mangaUri = mangaUri)
         var mangaImages = listOf<Bitmap>()
-        val mangaAdapter = MangaViewAdapter()
+        val onClickListener = View.OnClickListener { toggle() }
+        val mangaAdapter = MangaViewAdapter(onClickListener)
         binding.viewPager.adapter = mangaAdapter
         mangaViewModel.itemsLiveData.observe(this, androidx.lifecycle.Observer {
             Log.i("mangaImages", "${it.get(0)}")
@@ -144,6 +198,7 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
     }
 
     private fun toggle() {
+        Log.i("TOGGLE", "isFullscreen: ${isFullscreen}")
         if (isFullscreen) {
             hide()
         } else {
@@ -153,29 +208,31 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
 
     private fun hide() {
         // Hide UI first
-        supportActionBar?.hide()
+//        supportActionBar?.hide()
 //        fullscreenContentControls.visibility = View.GONE
         isFullscreen = false
+        val slideUp = AnimationUtils.loadAnimation(applicationContext, R.anim.slide_up)
 
+        binding.floatingBar.visibility = View.INVISIBLE
+        binding.floatingBar.startAnimation(slideUp)
         // Schedule a runnable to remove the status and navigation bar after a delay
         hideHandler.removeCallbacks(showPart2Runnable)
-        hideHandler.postDelayed(hidePart2Runnable, UI_ANIMATION_DELAY.toLong())
+        hideHandler.post(hidePart2Runnable)
     }
 
     private fun show() {
         // Show the system bar
-        if (Build.VERSION.SDK_INT >= 30) {
-            fullscreenContent.windowInsetsController?.show(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-        } else {
-            fullscreenContent.systemUiVisibility =
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-        }
+
+        val slideDown = AnimationUtils.loadAnimation(applicationContext, R.anim.slide_down)
+
+        binding.floatingBar.visibility = View.VISIBLE
+        binding.floatingBar.startAnimation(slideDown)
+//post with delay and another one without delay (delay is status bar, without is animation)
         isFullscreen = true
 
         // Schedule a runnable to display UI elements after a delay
         hideHandler.removeCallbacks(hidePart2Runnable)
-        hideHandler.postDelayed(showPart2Runnable, UI_ANIMATION_DELAY.toLong())
+        hideHandler.postDelayed(showPart2Runnable, 115.toLong())
     }
 
     /**
@@ -192,7 +249,7 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
          * Whether or not the system UI should be auto-hidden after
          * [AUTO_HIDE_DELAY_MILLIS] milliseconds.
          */
-        private const val AUTO_HIDE = true
+        private const val AUTO_HIDE = false
 
         /**
          * If [AUTO_HIDE] is set, the number of milliseconds to wait after
@@ -204,6 +261,6 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
          * Some older devices needs a small delay between UI widget updates
          * and a change of the status and navigation bar.
          */
-        private const val UI_ANIMATION_DELAY = 300
+        private const val UI_ANIMATION_DELAY = 0
     }
 }

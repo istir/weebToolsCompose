@@ -5,12 +5,13 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.davemorrissey.labs.subscaleview.ImageSource
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 
 
-class MangaViewAdapter() :
+class MangaViewAdapter(private val onClickListener: View.OnClickListener) :
     RecyclerView.Adapter<MangaViewAdapter.MangaViewHolder>() {
 
     inner class MangaViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -30,6 +31,10 @@ class MangaViewAdapter() :
         holder.itemView.run {
             val imageView = findViewById<SubsamplingScaleImageView>(R.id.imageViewManga)
             Log.i("BIND", "size: ${bitmaps.size}, position :${position}")
+//            imageView.setOnClickListener {
+//                Toast.makeText(context, "CLICK", Toast.LENGTH_SHORT).show()
+//            }
+            imageView.setOnClickListener(onClickListener)
             if (bitmaps.size >= position)
                 imageView.setImage(ImageSource.bitmap(bitmaps[position]))
         }
