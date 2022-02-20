@@ -3,13 +3,13 @@ package com.istir.weebtoolscompose
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -22,17 +22,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.documentfile.provider.DocumentFile
 import com.anggrayudi.storage.SimpleStorageHelper
+import com.anggrayudi.storage.file.baseName
+import com.anggrayudi.storage.file.mimeType
 import com.google.accompanist.insets.LocalWindowInsets
 import com.google.accompanist.insets.ProvideWindowInsets
-import com.google.accompanist.insets.cutoutPadding
-import com.google.accompanist.insets.statusBarsPadding
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
-import com.istir.weebtoolscompose.ui.theme.WeebToolsComposeTheme
 
 class MainActivity : ComponentActivity() {
     private val storageHelper = SimpleStorageHelper(this)
@@ -41,10 +39,74 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-
-
+        val mangaViewModel: MangaViewModel by viewModels()
+        //=============
+//TODO: this whole part should be async in model.
         pickedFolder = getFolderFromCache()
+        val db = DBHelper(applicationContext, null)
+//        db.onUpgrade(db.writableDatabase, 1, 2)
+        val folder =
+            DocumentFile.fromTreeUri(applicationContext, pickedFolder!!)
+        mangaViewModel.addMangas(db.getExistingMangas())
+        folder?.listFiles()?.let {
 
+            for (item in it) {
+//                if(item.mimeType)
+//                Log.i("MIME", "${item.mimeType}, ${item.name}")
+                if (item.mimeType == "application/x-cbz" || item.mimeType == "application/zip") {
+                    db.addManga(
+                        item.baseName!!,
+                        item.uri,
+                        0,
+                        123,
+                        !item.exists(),
+                        item.lastModified()
+                    )
+                        ?.let { it1 -> mangaViewModel.addManga(it1) }
+                }
+            }
+
+            for (item in db.getExistingMangas()) {
+                Log.i("MANGA", item.toString())
+            }
+
+            db.removeAllManga()
+
+            //====================
+//            db.editManga(
+//                "1.cbz",
+//                Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ADOujins/document/primary%3ADOujins%2F1.cbz"),
+//                "POLICJAMIDOKUCZA"
+//            )
+//                                    for (item in it) {
+//                                        db.addManga(
+//                                            name = item.name!!,
+//                                            uri = item.uri,
+//                                            0,
+//                                            123,
+//                                            false
+//                                        )
+//                                    }
+
+        }
+//
+//        Log.i(
+//            "CURSOR EXISTS", "${
+//                db.checkIfMangaExists(
+//                    name = "1.cbz",
+//                    uri = Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ADOujins/document/primary%3ADOujins%2F1.cbz")
+//                )
+//            }"
+//        )
+//        Log.i(
+//            "CURSOR EXISTS", "${
+//                db.checkIfMangaExists(
+//                    name = "1123asd.cbz",
+//                    uri = Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ADOujins/document/primary%3ADOujins%2F1.cbz"),
+//                    pages = 123
+//                )
+//            }"
+//        )
 
         setContent {
             val systemUIController = rememberSystemUiController()
@@ -77,11 +139,14 @@ class MainActivity : ComponentActivity() {
                             }
 
 
-                            if (pickedFolder != null) {
-                                val folder =
-                                    DocumentFile.fromTreeUri(applicationContext, pickedFolder!!)
-                                folder?.listFiles()?.let {
-                                    val db = DBHelper(applicationContext, null)
+//                            if (pickedFolder != null) {
+//                                val folder =
+//                                    DocumentFile.fromTreeUri(applicationContext, pickedFolder!!)
+//                                folder?.listFiles()?.let {
+
+//                                    for (item in db.getExistingMangas()) {
+//                                        Log.i("MANGA", item.toString())
+//                                    }
 //                                    for (item in it) {
 //                                        db.addManga(
 //                                            name = item.name!!,
@@ -91,12 +156,13 @@ class MainActivity : ComponentActivity() {
 //                                            false
 //                                        )
 //                                    }
-                                    MangaList(
-                                        documentFiles = it,
+                            MangaList(
+                                mangaViewModel = mangaViewModel
+//                                        documentFiles = it,
 
-                                        )
-                                }
-                            }
+                            )
+//                                }
+//                            }
                             Box(
                                 modifier = Modifier
                                     .height(theDp)
@@ -179,6 +245,35 @@ class MainActivity : ComponentActivity() {
 //
 //    }
 //}
+@Composable
+fun MangaList(mangaViewModel: MangaViewModel) {
+    val sorted = mangaViewModel.mangas.sortedByDescending { it.modifiedAt }
+    if (LocalWindowInsets.current.systemBars.top > 0) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Log.i("STATUS BAR", "${LocalWindowInsets.current.systemBars.top}")
+
+            val theDp = with(LocalDensity.current) {
+                LocalWindowInsets.current.systemBars.top.toDp()
+            }
+            Box(
+                modifier = Modifier
+                    .height(theDp)
+                    .fillMaxWidth()
+            )
+            for (manga in sorted) {
+//        val documentFile = DocumentFile.fromSingleUri(context, uri)
+
+//                documentFile.name?.let {
+                MangaListItem(
+                    manga = manga
+
+                )
+//                }
+
+            }
+        }
+    }
+}
 
 @Composable
 fun MangaList(documentFiles: Array<DocumentFile>) {
@@ -219,6 +314,26 @@ fun MangaList(documentFiles: Array<DocumentFile>) {
             }
         }
     }
+}
+
+@Composable
+fun MangaListItem(manga: Manga) {
+    val context1 = LocalContext.current
+    Button(
+        onClick = {
+            val intent = Intent(context1, MangaViewFullscreenActivity::class.java)
+            intent.putExtra("mangaUri", manga.uri.toString())
+            intent.putExtra("mangaName", manga.name)
+            context1.startActivity(intent)
+        },
+        Modifier
+            .fillMaxWidth()
+            .padding(15.dp)
+
+    ) {
+        Text(text = manga.name)
+    }
+
 }
 
 @Composable

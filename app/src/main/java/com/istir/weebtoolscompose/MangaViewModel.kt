@@ -43,6 +43,29 @@ class MangaViewModel : ViewModel() {
         currentCouroutines.remove(coroutineScope)
     }
 
+    var mangas = mutableStateListOf<Manga>()
+        private set
+
+    fun addManga(item: Manga) {
+        mangas.add(item)
+    }
+
+    fun addMangas(items: List<Manga>) {
+        mangas.addAll(items)
+    }
+
+    fun removeManga(item: Manga) {
+        mangas.remove(item)
+    }
+
+    fun removeMangaAt(index: Int) {
+        mangas.removeAt(index)
+    }
+
+    fun clearMangas() {
+        mangas.clear()
+    }
+
     var itemsLiveData = MutableLiveData<List<Bitmap>>()
 
     fun addLiveDataItem(item: Bitmap) {
