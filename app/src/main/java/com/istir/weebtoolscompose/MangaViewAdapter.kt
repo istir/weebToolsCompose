@@ -28,15 +28,21 @@ class MangaViewAdapter(private val onClickListener: View.OnClickListener) :
 
     override fun onBindViewHolder(holder: MangaViewHolder, position: Int) {
 //        TODO("Not yet implemented")
+        holder.setIsRecyclable(false) //TODO: this is temporary - app crashes without that
         holder.itemView.run {
             val imageView = findViewById<SubsamplingScaleImageView>(R.id.imageViewManga)
             Log.i("BIND", "size: ${bitmaps.size}, position :${position}")
 //            imageView.setOnClickListener {
 //                Toast.makeText(context, "CLICK", Toast.LENGTH_SHORT).show()
 //            }
+
             imageView.setOnClickListener(onClickListener)
             if (bitmaps.size >= position)
-                imageView.setImage(ImageSource.bitmap(bitmaps[position]))
+                if (bitmaps[position].isRecycled) {
+                    Log.i("RECYCLED", "recycled bitmap at ${position}")
+                } else {
+                    imageView.setImage(ImageSource.bitmap(bitmaps[position]))
+                }
         }
     }
 

@@ -1,6 +1,5 @@
 package com.istir.weebtoolscompose
 
-import androidx.appcompat.app.AppCompatActivity
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -12,16 +11,14 @@ import android.util.Log
 import android.view.*
 import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
-import android.widget.TextView
+import android.widget.PopupMenu
 import androidx.activity.viewModels
-import androidx.core.content.ContextCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
-import com.google.accompanist.insets.LocalWindowInsets
 import com.istir.weebtoolscompose.databinding.ActivityMangaViewFullscreenBinding
+
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -34,6 +31,7 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
     private lateinit var imageView: SubsamplingScaleImageView
     private val mangaViewModel: MangaViewModel by viewModels()
     private val hideHandler = Handler()
+    private var showMenu = true
 
     @SuppressLint("InlinedApi")
 
@@ -116,17 +114,46 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
                 "android"
             )
         )
-
-        if (h > 0) {
-//            val layoutParams = binding.floatingBar.layoutParams
-//            binding.floatingBar.height
-//            Log.i("HEIGHT", "${layoutParams.height}, ${binding.floatingBar.measuredHeightAndState}")
-//            layoutParams.height += h
-//            layoutParams.pa
-            binding.floatingBar.setPadding(0, h, 0, 0)
-//            binding.floatingBar.layoutParams = layoutParams
+        binding.floatingBar.setOnClickListener {
+            // just here to stop hiding the UI
         }
-        Log.i("height", "h:${h}")
+        binding.dotButton.setOnClickListener {
+//            showMenu = !showMenu
+//            val context = ContextThemeWrapper(applicationContext, R.style.PopupMenu) as Context
+
+
+            val popup = PopupMenu(this, binding.dotButton)
+            popup.gravity = Gravity.END
+            popup.menuInflater.inflate(R.menu.manga_viewer_menu, popup.menu)
+
+
+
+            popup.show()
+
+
+            popup.setOnMenuItemClickListener { menuItem: MenuItem ->
+                // Respond to menu item click.
+                true
+            }
+            popup.setOnDismissListener {
+                // Respond to popup being dismissed.
+            }
+
+//            invalidateOptionsMenu()
+//            menuInflater.inflate(R.menu.manga_viewer_menu)
+
+
+//            Toast.makeText(
+//                applicationContext,
+//                "Dots",
+//                Toast.LENGTH_SHORT
+//            ).show()
+        }
+        if (h > 0) {
+
+            binding.floatingBar.setPadding(0, h, 0, 0)
+        }
+//        Log.i("height", "h:${h}")
         attrib.layoutInDisplayCutoutMode =
             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -147,6 +174,13 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
         fullscreenContent.setOnClickListener { toggle() }
 
         val mangaUri: Uri = Uri.parse(intent.getStringExtra("mangaUri"))
+        val mangaName: String? = intent.getStringExtra("mangaName")
+        if (mangaName != null) {
+            binding.mangaNameText.setOnClickListener {
+                binding.mangaNameText.maxLines = if (binding.mangaNameText.maxLines == 10) 1 else 10
+            }
+            binding.mangaNameText.text = mangaName
+        }
         loadMangaImages(mangaUri = mangaUri)
 
 
@@ -168,6 +202,13 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
 //        binding.dummyButton.setOnTouchListener(delayHideTouchListener)
     }
 
+//    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+//        menuInflater.inflate(R.menu.manga_viewer_menu, menu)
+//        val item: MenuItem? = menu?.findItem(R.id.mangaViewerMenuSettings)
+//        item?.setVisible(showMenu)
+//        return true
+//    }
+
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
 
@@ -183,14 +224,35 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
         var mangaImages = listOf<Bitmap>()
         val onClickListener = View.OnClickListener { toggle() }
         val mangaAdapter = MangaViewAdapter(onClickListener)
+
         binding.viewPager.adapter = mangaAdapter
+        val recyclerView = binding.viewPager.getChildAt(0) as RecyclerView
+        var prevItem = 0
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                val positionView =
+                    (recyclerView.layoutManager as LinearLayoutManager?)!!.findFirstVisibleItemPosition()
+                if (positionView != prevItem && positionView >= 0) {
+//                    Log.i("Scroll", "${positionView}")
+                    binding.currentPageCount.text = "${positionView + 1}"
+                    prevItem = positionView
+                }
+//                    recyclerView.
+                super.onScrollStateChanged(recyclerView, newState)
+            }
+        })
         mangaViewModel.itemsLiveData.observe(this, androidx.lifecycle.Observer {
-            Log.i("mangaImages", "${it.get(0)}")
+//            Log.i("mangaImages", "${it.get(0)}")
 //            mangaImages = it
-            val recyclerView = binding.viewPager.getChildAt(0) as RecyclerView
             val state = recyclerView.layoutManager?.onSaveInstanceState()
             mangaAdapter.bitmaps = it
             recyclerView.layoutManager?.onRestoreInstanceState(state)
+//            val onScrollChangeListener =
+//            recyclerView.getpo
+
+
+            binding.maxPageCount.text = "${mangaAdapter.bitmaps.size}"
+
 //            mangaAdapter.bitmaps.addAll(it)
 //
 //            imageView.setImage(ImageSource.bitmap(it.get(0)))
@@ -198,7 +260,9 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
     }
 
     private fun toggle() {
-        Log.i("TOGGLE", "isFullscreen: ${isFullscreen}")
+//        Log.i("TOGGLE", "isFullscreen: ${isFullscreen}")
+        binding.mangaNameText.maxLines = 1
+
         if (isFullscreen) {
             hide()
         } else {

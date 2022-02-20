@@ -81,6 +81,16 @@ class MainActivity : ComponentActivity() {
                                 val folder =
                                     DocumentFile.fromTreeUri(applicationContext, pickedFolder!!)
                                 folder?.listFiles()?.let {
+                                    val db = DBHelper(applicationContext, null)
+//                                    for (item in it) {
+//                                        db.addManga(
+//                                            name = item.name!!,
+//                                            uri = item.uri,
+//                                            0,
+//                                            123,
+//                                            false
+//                                        )
+//                                    }
                                     MangaList(
                                         documentFiles = it,
 
@@ -180,6 +190,8 @@ fun MangaList(documentFiles: Array<DocumentFile>) {
 //    for (documentFile in documentFiles) {
 //
 //    }
+
+
     documentFiles.sortByDescending { it.lastModified() }
     if (LocalWindowInsets.current.systemBars.top > 0) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -216,6 +228,7 @@ fun MangaListItem(uri: Uri, name: String) {
         onClick = {
             val intent = Intent(context1, MangaViewFullscreenActivity::class.java)
             intent.putExtra("mangaUri", uri.toString())
+            intent.putExtra("mangaName", name)
             context1.startActivity(intent)
         },
         Modifier
