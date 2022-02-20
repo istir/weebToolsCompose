@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
@@ -20,7 +21,6 @@ class MangaViewModel : ViewModel() {
 
     lateinit var contentResolver: ContentResolver
     lateinit var mangaUri: Uri
-
 
 
     //    val currentCouroutines: ArrayList<Deferred<Unit>> = ArrayList()
@@ -43,6 +43,11 @@ class MangaViewModel : ViewModel() {
         currentCouroutines.remove(coroutineScope)
     }
 
+    var itemsLiveData = MutableLiveData<List<Bitmap>>()
+
+    fun addLiveDataItem(item: Bitmap) {
+        itemsLiveData.postValue(itemsLiveData.value?.plus(item) ?: listOf(item))
+    }
 
     var items = mutableStateListOf<Bitmap>()
         private set
@@ -53,6 +58,34 @@ class MangaViewModel : ViewModel() {
 
     fun clearItems() {
         items.clear()
+    }
+
+    fun initLiveData(contentResolver: ContentResolver, mangaUri: Uri) {
+        this.contentResolver = contentResolver
+        this.mangaUri = mangaUri
+        clearItems()
+        Log.i("START LIVE DATA", "")
+        viewModelScope.launch {
+//            this.cancel()
+//            currentCouroutines.add(this)
+
+            try {
+                CoroutineScope(Dispatchers.IO).async rt@{
+                    Log.i("START COURUTINE", "")
+//                    addCoroutine(this)
+//                    getZipSize()
+                    unzipFile(this)
+//                    removeCoroutine(this)
+                    return@rt
+                }.await()
+//                addCoroutine(deferred)
+//                deferred.await()
+            } catch (e: CancellationException) {
+                e.printStackTrace()
+            }
+//            currentCouroutines.remove(this)
+
+        }
     }
 
     fun init(contentResolver: ContentResolver, mangaUri: Uri) {
@@ -159,6 +192,7 @@ class MangaViewModel : ViewModel() {
 //                        Log.i("console.log", "$mangaUri, $currentUri")
 
                         addItem(bitmap)
+                        addLiveDataItem(bitmap)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }

@@ -2,4 +2,7 @@
     <string name="app_name">weebToolsCompose</string>
     <string name="pickedMangaFolder">NULL</string>
     <string name="title_activity_manga_view">MangaViewActivity</string>
+    <string name="title_activity_manga_view_fullscreen">MangaViewFullscreenActivity</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
 </resources>

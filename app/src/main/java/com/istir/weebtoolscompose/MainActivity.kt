@@ -214,7 +214,7 @@ fun MangaListItem(uri: Uri, name: String) {
     val context1 = LocalContext.current
     Button(
         onClick = {
-            val intent = Intent(context1, MangaViewActivity::class.java)
+            val intent = Intent(context1, MangaViewFullscreenActivity::class.java)
             intent.putExtra("mangaUri", uri.toString())
             context1.startActivity(intent)
         },
