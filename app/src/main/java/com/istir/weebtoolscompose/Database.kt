@@ -22,7 +22,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         // along with their data types is given
 
         val query =
-            "CREATE TABLE $TABLE_NAME ($ID_COL INTEGER PRIMARY KEY, $NAME_COL TEXT, $URI_COL TEXT, $PROGRESS_COL INTEGER, $PAGES_COL INTEGER, $ISDELETED_COL INTEGER, $MODIFIED_COL TEXT, $FOLDERNAME_COL TEXT, $FOLDERURI_COL TEXT)"
+            "CREATE TABLE $TABLE_NAME ($ID_COL INTEGER PRIMARY KEY, $NAME_COL TEXT, $URI_COL TEXT, $PROGRESS_COL INTEGER, $PAGES_COL INTEGER, $ISDELETED_COL INTEGER, $MODIFIED_COL TEXT, $FOLDERNAME_COL TEXT, $FOLDERURI_COL TEXT, $IMAGEURI_COL TEXT)"
         // we are calling sqlite
         // method for executing our query
         db.execSQL(query)
@@ -103,7 +103,8 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
             manga.deleted,
             manga.modifiedAt,
             manga.folderUri,
-            manga.folderName
+            manga.folderName,
+            manga.image
         )
     }
 
@@ -115,7 +116,8 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         deleted: Boolean,
         modified: Long,
         folderUri: Uri,
-        folderName: String
+        folderName: String,
+        imageUri: String
     ): Manga? {
         Log.i("addManga", "START")
         val check = checkIfMangaExists(name, uri)
@@ -131,6 +133,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         values.put(MODIFIED_COL, modified.toString())
         values.put(FOLDERNAME_COL, folderName)
         values.put(FOLDERURI_COL, folderUri.toString())
+        values.put(IMAGEURI_COL, imageUri)
         val db = this.writableDatabase
         val id = db.insert(TABLE_NAME, null, values)
         db.close()
@@ -145,7 +148,8 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
                 deleted,
                 modified,
                 folderUri,
-                folderName
+                folderName,
+                imageUri
             )
         }
 //
@@ -184,6 +188,23 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
             val values = ContentValues()
             values.put(URI_COL, newUri.toString())
             values.put(NAME_COL, newName)
+            updateMangaByUriAndName(values, originalUri, originalName)
+        }
+    }
+
+    fun editMangaCover(originalName: String, originalUri: Uri, newCover: String) {
+        if (checkIfMangaExists(originalName, originalUri)) {
+//            val db = this.writableDatabase
+//            db.execSQL(
+//                "UPDATE $TABLE_NAME SET $URI_COL = '$newUri' WHERE $NAME_COL = '${
+//                    escapeQuotes(
+//                        originalName
+//                    )
+//                }' AND $URI_COL = '$originalUri'"
+//            )
+//            db.close()
+            val values = ContentValues()
+            values.put(IMAGEURI_COL, newCover.toString())
             updateMangaByUriAndName(values, originalUri, originalName)
         }
     }
@@ -245,6 +266,29 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         updateManga(values, whereClause, whereArgs)
     }
 
+
+    fun getMangaProgress(uri: Uri): Int {
+        var progress = 0
+        val db = this.writableDatabase
+        val whereClause = "$URI_COL = ?"
+        val whereArgs = arrayOf(
+            uri.toString()
+        )
+        val select = arrayOf(PROGRESS_COL)
+        val cursor = db.query(TABLE_NAME, select, whereClause, whereArgs, null, null, null)
+
+        if (cursor != null) {
+            cursor.moveToFirst()
+//        do {
+            progress = cursor.getInt(cursor.getColumnIndexOrThrow(PROGRESS_COL))
+//            createManga(cursor = cursor)?.let { mangas.add(it) }
+//        } while (cursor.moveToNext())
+
+        }
+        db.close()
+        return progress
+    }
+
     fun editMangaProgress(originalUri: Uri, newProgress: Int) {
         val values = ContentValues()
         values.put(PROGRESS_COL, newProgress)
@@ -288,6 +332,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 
         }
     }
+
 
     fun updateMangaByUriAndName(newValues: ContentValues, uri: Uri, name: String) {
         val whereClause = "$NAME_COL = ? AND $URI_COL = ?"
@@ -381,7 +426,8 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
                 ) == 1,
                 modifiedAt = cursor.getString(cursor.getColumnIndexOrThrow(MODIFIED_COL)).toLong(),
                 folderName = cursor.getString(cursor.getColumnIndexOrThrow(FOLDERNAME_COL)),
-                folderUri = Uri.parse(cursor.getString(cursor.getColumnIndexOrThrow(FOLDERURI_COL)))
+                folderUri = Uri.parse(cursor.getString(cursor.getColumnIndexOrThrow(FOLDERURI_COL))),
+                image = cursor.getString(cursor.getColumnIndexOrThrow(IMAGEURI_COL))
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -448,6 +494,54 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         val columns = null
         val whereClause = "$ISDELETED_COL = 0 AND $FOLDERNAME_COL = ?"
         val whereArgs = arrayOf(folderName)
+        val orderBy = "$MODIFIED_COL DESC"
+        val cursor = db.query(TABLE_NAME, columns, whereClause, whereArgs, null, null, orderBy)
+
+        if (cursor != null) {
+            cursor.moveToFirst()
+            do {
+
+                createManga(cursor = cursor)?.let { mangas.add(it) }
+            } while (cursor.moveToNext())
+
+//            mangas.add()
+        }
+        db.close()
+        return mangas
+    }
+
+    fun getExistingMangasInFolderWithoutPages(folderUri: Uri): ArrayList<Manga> {
+        val mangas = ArrayList<Manga>()
+        val db = this.readableDatabase
+        val columns = null
+        val whereClause = "$PAGES_COL = -1 AND $ISDELETED_COL = 0 AND $FOLDERURI_COL = ?"
+        val whereArgs = arrayOf(folderUri.toString())
+        val orderBy = "$MODIFIED_COL DESC"
+        val cursor = db.query(TABLE_NAME, columns, whereClause, whereArgs, null, null, orderBy)
+
+        if (cursor != null) {
+            cursor.moveToFirst()
+            do {
+
+                createManga(cursor = cursor)?.let { mangas.add(it) }
+            } while (cursor.moveToNext())
+
+//            mangas.add()
+        }
+        db.close()
+        for (manga in mangas) {
+            Log.i("mangas without pages", manga.toString())
+        }
+
+        return mangas
+    }
+
+    fun getExistingMangasInFolderWithPages(folderUri: Uri): ArrayList<Manga> {
+        val mangas = ArrayList<Manga>()
+        val db = this.readableDatabase
+        val columns = null
+        val whereClause = "$PAGES_COL> -1 AND $ISDELETED_COL = 0 AND $FOLDERURI_COL = ?"
+        val whereArgs = arrayOf(folderUri.toString())
         val orderBy = "$MODIFIED_COL DESC"
         val cursor = db.query(TABLE_NAME, columns, whereClause, whereArgs, null, null, orderBy)
 
@@ -538,5 +632,6 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         val MODIFIED_COL = "modified"
         val FOLDERNAME_COL = "folderName"
         val FOLDERURI_COL = "folderUri"
+        val IMAGEURI_COL = "imageUri"
     }
 }

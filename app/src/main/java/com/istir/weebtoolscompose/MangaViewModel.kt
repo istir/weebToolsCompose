@@ -17,11 +17,12 @@ import androidx.lifecycle.viewModelScope
 import com.anggrayudi.storage.file.baseName
 import com.anggrayudi.storage.file.mimeType
 import kotlinx.coroutines.*
+import java.io.File
 import java.io.FileNotFoundException
-import java.lang.Exception
+import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
-import kotlin.collections.ArrayList
+
 
 class MangaViewModel : ViewModel() {
 
@@ -63,6 +64,17 @@ class MangaViewModel : ViewModel() {
         mangas.addAll(items)
     }
 
+    fun editManga(mangaToModify: Manga) {
+//        removeManga(oldManga)
+//        addManga(newManga)
+
+//        var m = mangas.find { manga -> manga.id == mangaToModify.id }
+//        m = mangaToModify
+        val index = mangas.indexOfFirst { it.id == mangaToModify.id }
+        if (index > 0)
+            mangas[index] = mangaToModify
+    }
+
     fun removeManga(item: Manga) {
         mangas.remove(item)
     }
@@ -92,6 +104,66 @@ class MangaViewModel : ViewModel() {
         items.clear()
     }
 
+
+    fun getMetadata(context: Context, mangas: ArrayList<Manga>) {
+        val dbHelper = DBHelper(context, null)
+        Log.i("METADATA?????????", "$mangas")
+        viewModelScope.launch {
+//            for (manga in mangas) {
+            mangas.map {
+                Log.i("pages", "${it.pages}")
+//                if (manga.pages == -1) {
+                async(Dispatchers.IO) {
+                    val pageCount = getZipSize(context.contentResolver, it.uri)
+                    val cover = getCoverImage(
+                        context,
+                        context.contentResolver,
+                        it.uri,
+                        it.id.toString()
+                    )
+                    Log.i("COVER", cover.toString())
+                    dbHelper.editMangaCover(it.name, it.uri, cover)
+//                    dbHelper.editMangaPages(it.uri, pageCount)
+                    removeManga(it)
+//                    val newManga = it
+                    it.image = cover
+                    it.pages = pageCount
+//                    addManga(it)
+//                    Log.i("PAGES", "forsenDespair ...")
+                    editManga(it)
+//                    removeMangaAt(2)
+//                    Log.i("it", "${it.toString()}")
+                }
+            }.awaitAll()
+//            Log.i("AWAITED", "ALL")
+        }
+//            this.cancel()
+//            currentCouroutines.add(this)
+
+//                try {
+//                    CoroutineScope(Dispatchers.IO).async rt@{
+//                        Log.i("START COURUTINE", "")
+//
+////                        val p = dbHelper.getMangaProgress(uri.uri)
+////                        Log.i("progress", "${p}")
+//
+//
+//
+////                        unzipFile(this)
+////                    removeCoroutine(this)
+//                        return@rt
+//                    }.await()
+//                addCoroutine(deferred)
+//                deferred.await()
+//                } catch (e: CancellationException) {
+//                    e.printStackTrace()
+//                }
+
+//            currentCouroutines.remove(this)
+
+
+    }
+
     fun initLiveData(contentResolver: ContentResolver, mangaUri: Uri) {
         this.contentResolver = contentResolver
         this.mangaUri = mangaUri
@@ -105,7 +177,7 @@ class MangaViewModel : ViewModel() {
                 CoroutineScope(Dispatchers.IO).async rt@{
                     Log.i("START COURUTINE", "")
 //                    addCoroutine(this)
-//                    getZipSize()
+//                    Log.i("zipSize", "${getZipSize()}")
                     unzipFile(this)
 //                    removeCoroutine(this)
                     return@rt
@@ -128,7 +200,14 @@ class MangaViewModel : ViewModel() {
             try {
                 CoroutineScope(Dispatchers.IO).async rt@{
                     Log.i("START COURUTINE", "DATABASE")
-                    addMangas(dbHelper.getExistingMangas())
+                    addMangas(dbHelper.getExistingMangasInFolder(Uri.parse(pickedFolder)))
+//                    for (manga in dbHelper.getExistingMangas()) {
+                    getMetadata(
+                        context,
+                        dbHelper.getExistingMangasInFolderWithoutPages(Uri.parse(pickedFolder))
+                    )
+//                    }
+
                     val folder = DocumentFile.fromTreeUri(context, Uri.parse(pickedFolder))
                     Log.i("initDatabase", "folder:$folder, uri: $pickedFolder")
                     folder?.listFiles()?.let {
@@ -142,11 +221,11 @@ class MangaViewModel : ViewModel() {
                                         item.baseName!!,
                                         item.uri,
                                         0,
-                                        123,
+                                        -1,
                                         !item.exists(),
                                         item.lastModified(),
                                         Uri.parse(pickedFolder),
-                                        it1
+                                        it1, ""
 
                                     )
                                         ?.let { it1 -> addManga(it1) }
@@ -225,18 +304,139 @@ class MangaViewModel : ViewModel() {
         }
     }
 
+    fun getCoverImage(
+        context: Context,
+        contentResolver: ContentResolver,
+        uri: Uri,
+        mangaName: String
+    ): String {
+//        var cover: String = ""
 
-    private fun getZipSize(): Int {
-        var size: Int = 0
-        Log.i("console.log", "START")
+//        val cacheDirectory = DocumentFile.fromFile(context.cacheDir)
+        val coverDirectory = context.getDir("cover", Context.MODE_PRIVATE)
+        val outFile = File(coverDirectory, "$mangaName.jpg")
+//        val cacheDirectory = DocumentFile.fromTreeUri(
+//            context,
+//            Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ADOujins/document/primary%3ADOujins")
+//        )
+//        val foundCoverDir = cacheDirectory?.findFolder("cover")
+//        var coverDirectory =
+//            foundCoverDir ?: cacheDirectory?.createDirectory("cover")
+//
+//
+////        val coverDirectory = cacheDirectory?.createDirectory("cover")
+//        Log.i("coverDir", "$CD")
+//        val outFile = coverDirectory!!.createFile("image/png", mangaName)
+
         try {
+//            val outputStream = contentResolver.openOutputStream(coverDirectory!!.uri)
+            val inputStream = contentResolver.openInputStream(uri)
+            var zipEntry: ZipEntry?
+            var readLen: Int
+            val readBuffer = ByteArray(4096)
+            ZipInputStream(inputStream).use { zipInputStream ->
+//
+                if (inputStream != null) {
+//                    Log.i("available", "${inputStream.available()}")
+                }
+//
+                while (zipInputStream.nextEntry.also { zipEntry = it } != null) {
+                    if (zipEntry?.isDirectory == true) continue
+                    if (zipEntry?.name?.endsWith("png") == true || zipEntry?.name?.endsWith("jpg") == true || zipEntry?.name?.endsWith(
+                            "jpeg"
+                        ) == true
+                    ) {
+//                        cover=zipEntry.
+                        val bytes = zipInputStream.readBytes()
+                        val bitmap: Bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+//                        bitmap.getScaledWidth(DisplayMetrics())
+                        val w = bitmap.width
+                        val h = bitmap.height
+                        var newW = 0
+                        var newH = 0
+                        val maxSize = 512
+                        if (w > h) {
+                            newH = h * maxSize / w
+                            newW = maxSize
+                        } else {
+                            newW = w * maxSize / h
+                            newH = maxSize
+                        }
+//                        bitmap.getScaledWidth()
+                        val out = FileOutputStream(outFile)
+                        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, newW, newH, false)
+                        //2048x1024
+                        //512x(1024*512/2048)
+                        //1024x2048
+                        //(1024*512/2048)x512
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                        out.flush()
+                        out.close()
+//960x764
 
-            val inputStream = this.contentResolver.openInputStream(this.mangaUri)
+//                        bitmap.compress(Bitmap.CompressFormat.JPEG,100,)
+                        zipInputStream.closeEntry()
+//contentResolver.openOutputStream(outFile.toURI())
+//                        context.openfil
+//                        contentResolver.openOutputStream(outFile!!.uri).use { oS ->
+//                            oS!!.write(bytes)
+////                            while (zipInputStream.read(readBuffer).also { readLen = it } != -1) {
+////                                oS!!.write(readBuffer, 0, readLen)
+////                            }
+//                        }
+                        break
+                    }
+//                    size += 1
+//                    val bytes = zipInputStream.readBytes()
+
+//                    val image: ImageView = ImageView(applicationContext)
+////                    try {
+//                        val bitmap: Bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+//
+////                        Log.i("console.log", "$mangaUri, $currentUri")
+//
+//                        addItem(bitmap)
+//                        addLiveDataItem(bitmap)
+//
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+//        Log.i(
+//            "OUTFILE",
+//            "abs: ${outFile.absolutePath}, can: ${outFile.canonicalPath}, path: ${outFile.path}, uri: ${outFile.toUri()}"
+//        )
+        return outFile.path
+//        return Uri.parse("")
+    }
+
+    private fun getZipSize(contentResolver: ContentResolver, uri: Uri): Int {
+        var size: Int = 0
+        Log.i("console.log", "START, $uri")
+        try {
+//            val cur = contentResolver.query(this.mangaUri, null, null, null, null)
+//            val column_index: Int? = cur?.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+//            Log.i("cur", "${column_index}")
+//            val uri: URI = URI(URLEncoder.encode(this.mangaUri.toString(), "UTF-8"))
+////            val uri1:Uri
+//            val file = File(uri)
+//            Log.i("FILE", "file: $file")
+
+//        val zipFile:net.lingala.zip4j.ZipFile =
+            val inputStream = contentResolver.openInputStream(uri)
+//            inputStream.available()
             var zipEntry: ZipEntry?
 
 //            val readBuffer = ByteArray(4096)
             ZipInputStream(inputStream).use { zipInputStream ->
 //                val po
+                if (inputStream != null) {
+//                    Log.i("available", "${inputStream.available()}")
+                }
+//                while (zipInputStream.nextEntry != null) {
+//                    size += 1
+//                }
                 while (zipInputStream.nextEntry.also { zipEntry = it } != null) {
                     if (zipEntry?.isDirectory == true) continue
 
@@ -253,10 +453,14 @@ class MangaViewModel : ViewModel() {
     }
 
     private fun unzipFile(scope: CoroutineScope) {
-        Log.i("UNZIP", "UNZIP_FILE")
+        Log.i("UNZIP", "UNZIP_FILE, ${this.mangaUri}")
+
+
         val currentUri = this.mangaUri
 
-
+//        val file = File(currentUri.toString())
+//        val zf = ZipFile(file)
+//        Log.i("size", "${zf.size()}")
 //        Log.i("isActive", scope.isActive.toString())
         try {
 

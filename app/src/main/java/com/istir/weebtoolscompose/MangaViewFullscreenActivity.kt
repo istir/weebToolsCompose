@@ -226,6 +226,7 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
         val mangaAdapter = MangaViewAdapter(onClickListener)
 
         binding.viewPager.adapter = mangaAdapter
+//        mangaAdapter.test = listOf(1, 2, 3)
         val recyclerView = binding.viewPager.getChildAt(0) as RecyclerView
         var prevItem = 0
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
@@ -241,6 +242,7 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
                 super.onScrollStateChanged(recyclerView, newState)
             }
         })
+
         mangaViewModel.itemsLiveData.observe(this, androidx.lifecycle.Observer {
 //            Log.i("mangaImages", "${it.get(0)}")
 //            mangaImages = it
@@ -251,7 +253,7 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
 //            recyclerView.getpo
 
 
-            binding.maxPageCount.text = "${mangaAdapter.bitmaps.size}"
+//            binding.maxPageCount.text = "${mangaAdapter.bitmaps.size}"
 
 //            mangaAdapter.bitmaps.addAll(it)
 //
