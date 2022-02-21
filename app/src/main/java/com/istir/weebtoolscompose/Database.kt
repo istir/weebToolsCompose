@@ -3,10 +3,14 @@ package com.istir.weebtoolscompose
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
+import android.database.DatabaseUtils
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import android.database.sqlite.SQLiteQueryBuilder
 import android.net.Uri
 import android.util.Log
+import kotlin.text.Regex.Companion.escape
+import kotlin.text.Regex.Companion.escapeReplacement
 
 
 class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
@@ -18,7 +22,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         // along with their data types is given
 
         val query =
-            "CREATE TABLE $TABLE_NAME ($ID_COL INTEGER PRIMARY KEY, $NAME_COL TEXT, $URI_COL TEXT, $PROGRESS_COL INTEGER, $PAGES_COL INTEGER, $ISDELETED_COL INTEGER, $MODIFIED_COL TEXT)"
+            "CREATE TABLE $TABLE_NAME ($ID_COL INTEGER PRIMARY KEY, $NAME_COL TEXT, $URI_COL TEXT, $PROGRESS_COL INTEGER, $PAGES_COL INTEGER, $ISDELETED_COL INTEGER, $MODIFIED_COL TEXT, $FOLDERNAME_COL TEXT, $FOLDERURI_COL TEXT)"
         // we are calling sqlite
         // method for executing our query
         db.execSQL(query)
@@ -37,6 +41,15 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         return checkIfMangaExists(name, uri, null)
     }
 
+    fun escapeQuotes(string: String): String {
+        var replaced = string.replace("\'", "\'\'")
+        replaced = replaced.replace(
+            "\"",
+            "\"\""
+        )
+        return replaced
+    }
+
     fun checkIfMangaExists(
         name: String,
         uri: Uri,
@@ -44,22 +57,32 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
     ): Boolean {
 //        val mangas = ArrayList<Manga>()
         val db = this.readableDatabase
-        var query = "SELECT * FROM $TABLE_NAME WHERE $NAME_COL = '$name' AND $URI_COL = '$uri'"
-        if (pages != null) {
-            query += " AND $PAGES_COL = '$pages'"
-        }
-        val cursor = db.rawQuery(
-            query,
-            null
+        val columns = arrayOf(ID_COL)
+        val whereClause = "$NAME_COL = ? AND $URI_COL = ?"
+        val whereArgs = arrayOf(
+            name, uri.toString()
         )
 
+        val cursor = db.query(TABLE_NAME, columns, whereClause, whereArgs, null, null, null)
+
+        Log.i("checkIfMangaExists", "${cursor}")
         if (cursor != null) {
+            Log.i("checkIfMangaExists", "not null")
             cursor.moveToFirst()
 
             return try {
-                cursor.getInt(cursor.getColumnIndexOrThrow(ID_COL))
+                val a = cursor.getInt(cursor.getColumnIndexOrThrow(ID_COL))
+                Log.i(
+                    "checkIfMangaExists",
+                    "return try, ${a}"
+                )
+
                 true
             } catch (e: Exception) {
+                Log.i(
+                    "checkIfMangaExists",
+                    "exception $e"
+                )
                 false
             }
 
@@ -78,7 +101,9 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
             manga.currentPosition,
             manga.pages,
             manga.deleted,
-            manga.modifiedAt
+            manga.modifiedAt,
+            manga.folderUri,
+            manga.folderName
         )
     }
 
@@ -88,9 +113,15 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         currentPosition: Int,
         pages: Int,
         deleted: Boolean,
-        modified: Long
+        modified: Long,
+        folderUri: Uri,
+        folderName: String
     ): Manga? {
-        if (checkIfMangaExists(name, uri)) return null
+        Log.i("addManga", "START")
+        val check = checkIfMangaExists(name, uri)
+        Log.i("addManga", "check: $check")
+        if (check) return null
+        Log.i("addManga", "NOT NULL")
         val values = ContentValues()
         values.put(NAME_COL, name)
         values.put(URI_COL, uri.toString())
@@ -98,80 +129,180 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         values.put(PAGES_COL, pages)
         values.put(ISDELETED_COL, if (deleted) 1 else 0)
         values.put(MODIFIED_COL, modified.toString())
+        values.put(FOLDERNAME_COL, folderName)
+        values.put(FOLDERURI_COL, folderUri.toString())
         val db = this.writableDatabase
         val id = db.insert(TABLE_NAME, null, values)
         db.close()
         Log.i("ID", "${id}")
         if (id > 0) {
-            return Manga(id.toInt(), name, uri, currentPosition, pages, deleted, modified)
+            return Manga(
+                id.toInt(),
+                name,
+                uri,
+                currentPosition,
+                pages,
+                deleted,
+                modified,
+                folderUri,
+                folderName
+            )
         }
 //
         return null
     }
 
-    fun editManga(id: Int, newModified: Long) {
+    fun editMangaModified(id: Int, newModified: Long) {
         val db = this.writableDatabase
-        try {
-            db.execSQL("UPDATE $TABLE_NAME SET $MODIFIED_COL = $newModified WHERE $ID_COL=$id")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        val whereClause = "$ID_COL = ?"
+        val whereArgs = arrayOf(
+            id.toString()
+        )
+        val values = ContentValues()
+        values.put(MODIFIED_COL, newModified.toString())
+        updateManga(values, whereClause, whereArgs)
+//        try {
+//            db.execSQL("UPDATE $TABLE_NAME SET $MODIFIED_COL = $newModified WHERE $ID_COL=$id")
+//        } catch (e: Exception) {
+//            e.printStackTrace()
+//        }
 
         db.close()
     }
 
-    fun editManga(originalName: String, originalUri: Uri, newModified: Long) {
+    fun editMangaModified(originalName: String, originalUri: Uri, newModified: Long) {
 //    if (checkIfMangaExists(originalName, originalUri)) {
-        val db = this.writableDatabase
-        try {
-            db.execSQL("UPDATE $TABLE_NAME SET $MODIFIED_COL = $newModified WHERE $NAME_COL = '$originalName' AND $URI_COL = '$originalUri'")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        val values = ContentValues()
 
-        db.close()
+        values.put(MODIFIED_COL, newModified.toString())
+        updateMangaByUriAndName(values, originalUri, originalName)
 //    }
     }
 
-    fun editManga(originalName: String, originalUri: Uri, newName: String, newUri: Uri) {
+    fun editMangaNameAndUri(originalName: String, originalUri: Uri, newName: String, newUri: Uri) {
         if (checkIfMangaExists(originalName, originalUri)) {
-            val db = this.writableDatabase
-            db.execSQL("UPDATE $TABLE_NAME SET $NAME_COL = '$newName', $URI_COL = '$newUri' WHERE $NAME_COL = '$originalName' AND $URI_COL = '$originalUri'")
-            db.close()
+            val values = ContentValues()
+            values.put(URI_COL, newUri.toString())
+            values.put(NAME_COL, newName)
+            updateMangaByUriAndName(values, originalUri, originalName)
         }
     }
 
-    fun editManga(originalName: String, originalUri: Uri, newUri: Uri) {
+    fun editMangaUri(originalName: String, originalUri: Uri, newUri: Uri) {
         if (checkIfMangaExists(originalName, originalUri)) {
-            val db = this.writableDatabase
-            db.execSQL("UPDATE $TABLE_NAME SET $URI_COL = '$newUri' WHERE $NAME_COL = '$originalName' AND $URI_COL = '$originalUri'")
-            db.close()
+//            val db = this.writableDatabase
+//            db.execSQL(
+//                "UPDATE $TABLE_NAME SET $URI_COL = '$newUri' WHERE $NAME_COL = '${
+//                    escapeQuotes(
+//                        originalName
+//                    )
+//                }' AND $URI_COL = '$originalUri'"
+//            )
+//            db.close()
+            val values = ContentValues()
+            values.put(URI_COL, newUri.toString())
+            updateMangaByUriAndName(values, originalUri, originalName)
         }
     }
 
-    fun editManga(originalName: String, originalUri: Uri, newDeleted: Boolean) {
+    fun editMangaDeleted(originalName: String, originalUri: Uri, newDeleted: Boolean) {
         if (checkIfMangaExists(originalName, originalUri)) {
-            val db = this.writableDatabase
-            db.execSQL("UPDATE $TABLE_NAME SET $ISDELETED_COL = ${if (newDeleted) 1 else 0} WHERE $NAME_COL = '$originalName' AND $URI_COL = '$originalUri'")
-            db.close()
+//            val db = this.writableDatabase
+//            db.execSQL(
+//                "UPDATE $TABLE_NAME SET $ISDELETED_COL = ${if (newDeleted) 1 else 0} WHERE $NAME_COL = '${
+//                    escapeQuotes(
+//                        originalName
+//                    )
+//                }' AND $URI_COL = '$originalUri'"
+//            )
+            val values = ContentValues()
+            values.put(ISDELETED_COL, if (newDeleted) 1 else 0)
+            updateMangaByUriAndName(values, originalUri, originalName)
+//            db.close()
         }
     }
 
-    fun editManga(originalName: String, originalUri: Uri, newName: String) {
+    fun editMangaName(originalName: String, originalUri: Uri, newName: String) {
+
         if (checkIfMangaExists(originalName, originalUri)) {
-            val db = this.writableDatabase
-            db.execSQL("UPDATE $TABLE_NAME SET $NAME_COL = '$newName' WHERE $NAME_COL = '$originalName' AND $URI_COL = '$originalUri'")
-            db.close()
+//            val db = this.writableDatabase
+
+            val values = ContentValues()
+            values.put(NAME_COL, newName)
+            updateMangaByUriAndName(values, originalUri, originalName)
+//            db.update(TABLE_NAME, values, whereClause, whereArgs)
+//            db.close()
         }
     }
 
+    fun editMangaPages(originalUri: Uri, newPages: Int) {
+        val values = ContentValues()
+        values.put(PAGES_COL, newPages)
+        val whereClause = "$URI_COL = ?"
+        val whereArgs = arrayOf(
+            originalUri.toString()
+        )
+        updateManga(values, whereClause, whereArgs)
+    }
+
+    fun editMangaProgress(originalUri: Uri, newProgress: Int) {
+        val values = ContentValues()
+        values.put(PROGRESS_COL, newProgress)
+        val whereClause = "$URI_COL = ?"
+        val whereArgs = arrayOf(
+            originalUri.toString()
+        )
+        updateManga(values, whereClause, whereArgs)
+    }
 
     fun editManga(originalName: String, originalUri: Uri, newManga: Manga) {
         if (checkIfMangaExists(originalName, originalUri)) {
-            val db = this.writableDatabase
-            db.execSQL("UPDATE $TABLE_NAME SET $NAME_COL = '${newManga.name}', $URI_COL = '${newManga.uri}', $PROGRESS_COL = ${newManga.currentPosition}, $PAGES_COL = ${newManga.pages}, $ISDELETED_COL = ${if (newManga.deleted) 1 else 0} WHERE $NAME_COL = '$originalName' AND $URI_COL = '$originalUri'")
-            db.close()
+
+//            val columns = null
+//            val whereClause = "$NAME_COL = ? AND $URI_COL = ?"
+//            val whereArgs = arrayOf(
+//                originalName, originalUri.toString()
+//            )
+//            val orderBy = "$MODIFIED_COL DESC"
+
+//            val values
+            val values = ContentValues()
+            values.put(NAME_COL, newManga.name)
+            values.put(URI_COL, newManga.uri.toString())
+            values.put(PROGRESS_COL, newManga.currentPosition)
+            values.put(PAGES_COL, newManga.pages)
+            values.put(ISDELETED_COL, if (newManga.deleted) 1 else 0)
+            values.put(MODIFIED_COL, newManga.modifiedAt.toString())
+//            val cursor = db.update(TABLE_NAME, columns, whereClause, whereArgs, null, null, orderBy)
+            updateMangaByUriAndName(values, originalUri, originalName)
+//            db.update(TABLE_NAME, values, whereClause, whereArgs)
+
+
+//            db.execSQL(
+//                "UPDATE $TABLE_NAME SET $NAME_COL = '${escapeQuotes(newManga.name)}', $URI_COL = '${newManga.uri}', $PROGRESS_COL = ${newManga.currentPosition}, $PAGES_COL = ${newManga.pages}, $ISDELETED_COL = ${if (newManga.deleted) 1 else 0}, $MODIFIED_COL = ${newManga.modifiedAt} WHERE $NAME_COL = '${
+//                    escapeQuotes(
+//                        originalName
+//                    )
+//                }' AND $URI_COL = '$originalUri'"
+//            )
+
         }
+    }
+
+    fun updateMangaByUriAndName(newValues: ContentValues, uri: Uri, name: String) {
+        val whereClause = "$NAME_COL = ? AND $URI_COL = ?"
+        val whereArgs = arrayOf(
+            name, uri.toString()
+        )
+        updateManga(newValues, whereClause, whereArgs)
+    }
+
+    fun updateManga(newValues: ContentValues, whereClause: String, whereArgs: Array<String>) {
+
+        val db = this.writableDatabase
+        db.update(TABLE_NAME, newValues, whereClause, whereArgs)
+        db.close()
+
     }
 
     fun removeManga(name: String) {
@@ -248,7 +379,9 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
                         ISDELETED_COL
                     )
                 ) == 1,
-                modifiedAt = cursor.getString(cursor.getColumnIndexOrThrow(MODIFIED_COL)).toLong()
+                modifiedAt = cursor.getString(cursor.getColumnIndexOrThrow(MODIFIED_COL)).toLong(),
+                folderName = cursor.getString(cursor.getColumnIndexOrThrow(FOLDERNAME_COL)),
+                folderUri = Uri.parse(cursor.getString(cursor.getColumnIndexOrThrow(FOLDERURI_COL)))
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -259,10 +392,20 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
     fun getMangasWithUri(uri: Uri): ArrayList<Manga> {
         val mangas = ArrayList<Manga>()
         val db = this.readableDatabase
-        val cursor = db.rawQuery(
-            "SELECT * FROM $TABLE_NAME WHERE $ISDELETED_COL = 0 AND $URI_COL = $uri",
-            null
+
+        val columns = null
+        val whereClause = "$ISDELETED_COL = 0 AND $URI_COL = ?"
+        val whereArgs = arrayOf(
+            uri.toString()
         )
+        val orderBy = "$MODIFIED_COL DESC"
+        val cursor = db.query(TABLE_NAME, columns, whereClause, whereArgs, null, null, orderBy)
+
+
+//        val cursor = db.rawQuery(
+//            "SELECT * FROM $TABLE_NAME WHERE $ISDELETED_COL = 0 AND $URI_COL = $uri",
+//            null
+//        )
         if (cursor != null) {
             cursor.moveToFirst()
             do {
@@ -277,10 +420,16 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
     fun getMangasWithName(name: String): ArrayList<Manga> {
         val mangas = ArrayList<Manga>()
         val db = this.readableDatabase
-        val cursor = db.rawQuery(
-            "SELECT * FROM $TABLE_NAME WHERE $ISDELETED_COL = 0 AND $NAME_COL = '$name'",
-            null
+
+        val columns = null
+        val whereClause = "$ISDELETED_COL = 0 AND $NAME_COL = ?"
+        val whereArgs = arrayOf(
+            name
         )
+        val orderBy = "$MODIFIED_COL DESC"
+        val cursor = db.query(TABLE_NAME, columns, whereClause, whereArgs, null, null, orderBy)
+
+
         if (cursor != null) {
             cursor.moveToFirst()
             do {
@@ -293,10 +442,58 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         return mangas
     }
 
+    fun getExistingMangasInFolder(folderName: String): ArrayList<Manga> {
+        val mangas = ArrayList<Manga>()
+        val db = this.readableDatabase
+        val columns = null
+        val whereClause = "$ISDELETED_COL = 0 AND $FOLDERNAME_COL = ?"
+        val whereArgs = arrayOf(folderName)
+        val orderBy = "$MODIFIED_COL DESC"
+        val cursor = db.query(TABLE_NAME, columns, whereClause, whereArgs, null, null, orderBy)
+
+        if (cursor != null) {
+            cursor.moveToFirst()
+            do {
+
+                createManga(cursor = cursor)?.let { mangas.add(it) }
+            } while (cursor.moveToNext())
+
+//            mangas.add()
+        }
+        db.close()
+        return mangas
+    }
+
+    fun getExistingMangasInFolder(folderUri: Uri): ArrayList<Manga> {
+        val mangas = ArrayList<Manga>()
+        val db = this.readableDatabase
+        val columns = null
+        val whereClause = "$ISDELETED_COL = 0 AND $FOLDERURI_COL = ?"
+        val whereArgs = arrayOf(folderUri.toString())
+        val orderBy = "$MODIFIED_COL DESC"
+        val cursor = db.query(TABLE_NAME, columns, whereClause, whereArgs, null, null, orderBy)
+
+        if (cursor != null) {
+            cursor.moveToFirst()
+            do {
+
+                createManga(cursor = cursor)?.let { mangas.add(it) }
+            } while (cursor.moveToNext())
+
+//            mangas.add()
+        }
+        db.close()
+        return mangas
+    }
+
     fun getExistingMangas(): ArrayList<Manga> {
         val mangas = ArrayList<Manga>()
         val db = this.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM ${TABLE_NAME} WHERE ${ISDELETED_COL} = 0", null)
+        val columns = null
+        val whereClause = "$ISDELETED_COL = 0 "
+        val orderBy = "$MODIFIED_COL DESC"
+        val cursor = db.query(TABLE_NAME, columns, whereClause, null, null, null, orderBy)
+
         if (cursor != null) {
             cursor.moveToFirst()
             do {
@@ -311,42 +508,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 //        db.query(table= TABLE_NAME,)
     }
 
-    // below method is to get
-    // all data from our database
-//    fun getName(): Cursor? {
-//
-//        // here we are creating a readable
-//        // variable of our database
-//        // as we want to read value from it
-//        val db = this.readableDatabase
-//
-//        // below code returns a cursor to
-//        // read data from the database
-//        return db.rawQuery("SELECT * FROM " + TABLE_NAME, null)
-//
-//    }
 
-    //    companion object{
-//        // here we have defined variables for our database
-//
-//        // below is variable for database name
-//        private val DATABASE_NAME = "GEEKS_FOR_GEEKS"
-//
-//        // below is the variable for database version
-//        private val DATABASE_VERSION = 1
-//
-//        // below is the variable for table name
-//        val TABLE_NAME = "gfg_table"
-//
-//        // below is the variable for id column
-//        val ID_COL = "id"
-//
-//        // below is the variable for name column
-//        val NAME_COl = "name"
-//
-//        // below is the variable for age column
-//        val AGE_COL = "age"
-//    }
     companion object {
         // here we have defined variables for our database
 
@@ -374,5 +536,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 
         val ISDELETED_COL = "isDeleted"
         val MODIFIED_COL = "modified"
+        val FOLDERNAME_COL = "folderName"
+        val FOLDERURI_COL = "folderUri"
     }
 }

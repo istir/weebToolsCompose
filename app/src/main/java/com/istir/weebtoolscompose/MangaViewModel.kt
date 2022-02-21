@@ -1,14 +1,21 @@
 package com.istir.weebtoolscompose
 
 import android.content.ContentResolver
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anggrayudi.storage.file.baseName
+import com.anggrayudi.storage.file.mimeType
 import kotlinx.coroutines.*
 import java.io.FileNotFoundException
 import java.lang.Exception
@@ -21,6 +28,8 @@ class MangaViewModel : ViewModel() {
 
     lateinit var contentResolver: ContentResolver
     lateinit var mangaUri: Uri
+
+    var pickedFolder by mutableStateOf("")
 
 
     //    val currentCouroutines: ArrayList<Deferred<Unit>> = ArrayList()
@@ -109,6 +118,73 @@ class MangaViewModel : ViewModel() {
 //            currentCouroutines.remove(this)
 
         }
+    }
+
+    fun initDatabase(context: Context) {
+        if (pickedFolder == "") return
+        val dbHelper = DBHelper(context, null)
+//        dbHelper.onUpgrade(dbHelper.writableDatabase, 1, 2)
+        viewModelScope.launch {
+            try {
+                CoroutineScope(Dispatchers.IO).async rt@{
+                    Log.i("START COURUTINE", "DATABASE")
+                    addMangas(dbHelper.getExistingMangas())
+                    val folder = DocumentFile.fromTreeUri(context, Uri.parse(pickedFolder))
+                    Log.i("initDatabase", "folder:$folder, uri: $pickedFolder")
+                    folder?.listFiles()?.let {
+
+                        for (item in it) {
+//                if(item.mimeType)
+//                Log.i("MIME", "${item.mimeType}, ${item.name}")
+                            if (item.mimeType == "application/x-cbz" || item.mimeType == "application/zip") {
+                                folder.name?.let { it1 ->
+                                    dbHelper.addManga(
+                                        item.baseName!!,
+                                        item.uri,
+                                        0,
+                                        123,
+                                        !item.exists(),
+                                        item.lastModified(),
+                                        Uri.parse(pickedFolder),
+                                        it1
+
+                                    )
+                                        ?.let { it1 -> addManga(it1) }
+                                }
+                            }
+                        }
+
+                        for (item in dbHelper.getExistingMangasInFolder(Uri.parse(pickedFolder))) {
+                            Log.i("MANGA", item.toString())
+//                            dbHelper.editManga(item.name, item.uri, "TESTINGTESTING")
+                        }
+
+//                        dbHelper.removeAllManga()
+
+                        //====================
+//            db.editManga(
+//                "1.cbz",
+//                Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ADOujins/document/primary%3ADOujins%2F1.cbz"),
+//                "POLICJAMIDOKUCZA"
+//            )
+//                                    for (item in it) {
+//                                        db.addManga(
+//                                            name = item.name!!,
+//                                            uri = item.uri,
+//                                            0,
+//                                            123,
+//                                            false
+//                                        )
+//                                    }
+
+                    }
+                    return@rt
+                }.await()
+            } catch (e: CancellationException) {
+                e.printStackTrace()
+            }
+        }
+
     }
 
     fun init(contentResolver: ContentResolver, mangaUri: Uri) {

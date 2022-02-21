@@ -34,61 +34,71 @@ import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 class MainActivity : ComponentActivity() {
     private val storageHelper = SimpleStorageHelper(this)
-    private var pickedFolder: Uri? = null //state later
+//    private var pickedFolder: Uri? = null //state later
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val mangaViewModel: MangaViewModel by viewModels()
         //=============
-//TODO: this whole part should be async in model.
-        pickedFolder = getFolderFromCache()
-        val db = DBHelper(applicationContext, null)
-//        db.onUpgrade(db.writableDatabase, 1, 2)
+
+//        pickedFolder = getFolderFromCache()
+        mangaViewModel.pickedFolder = getFolderFromCache().toString()
+//        val db = DBHelper(applicationContext, null)
+
+
+        /**
+        //TODO: this whole part should be async in model.
+
+
+        //        db.onUpgrade(db.writableDatabase, 1, 2)
         val folder =
-            DocumentFile.fromTreeUri(applicationContext, pickedFolder!!)
+        DocumentFile.fromTreeUri(applicationContext, pickedFolder!!)
         mangaViewModel.addMangas(db.getExistingMangas())
         folder?.listFiles()?.let {
 
-            for (item in it) {
-//                if(item.mimeType)
-//                Log.i("MIME", "${item.mimeType}, ${item.name}")
-                if (item.mimeType == "application/x-cbz" || item.mimeType == "application/zip") {
-                    db.addManga(
-                        item.baseName!!,
-                        item.uri,
-                        0,
-                        123,
-                        !item.exists(),
-                        item.lastModified()
-                    )
-                        ?.let { it1 -> mangaViewModel.addManga(it1) }
-                }
-            }
+        for (item in it) {
+        //                if(item.mimeType)
+        //                Log.i("MIME", "${item.mimeType}, ${item.name}")
+        if (item.mimeType == "application/x-cbz" || item.mimeType == "application/zip") {
+        db.addManga(
+        item.baseName!!,
+        item.uri,
+        0,
+        123,
+        !item.exists(),
+        item.lastModified()
+        )
+        ?.let { it1 -> mangaViewModel.addManga(it1) }
+        }
+        }
 
-            for (item in db.getExistingMangas()) {
-                Log.i("MANGA", item.toString())
-            }
+        for (item in db.getExistingMangas()) {
+        Log.i("MANGA", item.toString())
+        }
 
-            db.removeAllManga()
+        db.removeAllManga()
 
-            //====================
-//            db.editManga(
-//                "1.cbz",
-//                Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ADOujins/document/primary%3ADOujins%2F1.cbz"),
-//                "POLICJAMIDOKUCZA"
-//            )
-//                                    for (item in it) {
-//                                        db.addManga(
-//                                            name = item.name!!,
-//                                            uri = item.uri,
-//                                            0,
-//                                            123,
-//                                            false
-//                                        )
-//                                    }
+
+
+        //            db.editManga(
+        //                "1.cbz",
+        //                Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ADOujins/document/primary%3ADOujins%2F1.cbz"),
+        //                "POLICJAMIDOKUCZA"
+        //            )
+        //                                    for (item in it) {
+        //                                        db.addManga(
+        //                                            name = item.name!!,
+        //                                            uri = item.uri,
+        //                                            0,
+        //                                            123,
+        //                                            false
+        //                                        )
+        //                                    }
 
         }
+        //====================
+         */
 //
 //        Log.i(
 //            "CURSOR EXISTS", "${
@@ -109,6 +119,11 @@ class MainActivity : ComponentActivity() {
 //        )
 
         setContent {
+            LaunchedEffect(mangaViewModel.pickedFolder) {
+                mangaViewModel.clearMangas()
+                Log.i("CLEAR", "??")
+                mangaViewModel.initDatabase(applicationContext)
+            }
             val systemUIController = rememberSystemUiController()
             systemUIController.setSystemBarsColor(Color.Transparent)
 
@@ -176,7 +191,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                     )
                             )
-                            ChooseFolderButton({ setupSimpleStorage() })
+                            ChooseFolderButton({ setupSimpleStorage(mangaViewModel) })
                         }
 
 
@@ -197,6 +212,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun addFolderToCache(folder: DocumentFile) {
+        Log.i("SAVE?", "")
         val sharedPreferences: SharedPreferences = this.getPreferences(Context.MODE_PRIVATE);
         val editor = sharedPreferences.edit()
         editor.putString(getString(R.string.pickedMangaFolder), folder.uri.toString())
@@ -218,11 +234,15 @@ class MainActivity : ComponentActivity() {
         return null;
     }
 
-    private fun setupSimpleStorage() {
+    private fun setupSimpleStorage(mangaViewModel: MangaViewModel) {
         storageHelper.onFolderSelected = { requestCode: Int, folder: DocumentFile ->
             Toast.makeText(baseContext, "Selected: ${folder.name}", Toast.LENGTH_LONG).show()
 //            pickedFolder = folder
-            this.pickedFolder = folder.uri
+//            this.pickedFolder = folder.uri
+            mangaViewModel.clearMangas()
+
+            mangaViewModel.pickedFolder = folder.uri.toString()
+//            mangaViewModel.initDatabase(applicationContext)
             addFolderToCache(folder)
 //            populateList(folder)
         }

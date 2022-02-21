@@ -9,9 +9,11 @@ class Manga(
     public var currentPosition: Int,
     public var pages: Int,
     public var deleted: Boolean,
-    public var modifiedAt: Long
+    public var modifiedAt: Long,
+    public var folderUri: Uri,
+    public var folderName: String
 ) {
     override fun toString(): String {
-        return "id: $id, name: $name, uri: $uri, currentProgress: $currentPosition, pages: $pages, isDeleted: $deleted, modifiedAt: $modifiedAt"
+        return "id: $id, name: $name, uri: $uri, currentProgress: $currentPosition, pages: $pages, isDeleted: $deleted, modifiedAt: $modifiedAt, folderName: $folderName, folderUri: $folderUri"
     }
 }
