@@ -229,6 +229,7 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
 //        mangaAdapter.test = listOf(1, 2, 3)
         val recyclerView = binding.viewPager.getChildAt(0) as RecyclerView
         var prevItem = 0
+        val dbHelper = DBHelper(applicationContext, null)
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 val positionView =
@@ -236,6 +237,8 @@ class MangaViewFullscreenActivity : AppCompatActivity() {
                 if (positionView != prevItem && positionView >= 0) {
 //                    Log.i("Scroll", "${positionView}")
                     binding.currentPageCount.text = "${positionView + 1}"
+
+                    dbHelper.editMangaProgress(mangaViewModel.mangaUri, positionView + 1)
                     prevItem = positionView
                 }
 //                    recyclerView.

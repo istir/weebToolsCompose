@@ -63,6 +63,18 @@ val md_theme_dark_shadow = Color(0xFF000000)
 val seed = Color(0xFF6750A4)
 val error = Color(0xFFB3261E)
 
+//val ShimmerColorShades = listOf(
+////Color.Pr
+//    Color()
+//    Color.LightGray.copy(0.9f),
+//
+//    Color.LightGray.copy(0.2f),
+//
+//    Color.LightGray.copy(0.9f)
+//
+//)
+
+
 val Purple200 = Color(0xFFBB86FC)
 val Purple500 = Color(0xFF6200EE)
 val Purple700 = Color(0xFF3700B3)

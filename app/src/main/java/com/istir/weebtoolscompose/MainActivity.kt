@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+//import android.graphics.Color
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Bundle
@@ -14,23 +15,26 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.animation.core.DecayAnimationSpec
+import androidx.compose.animation.animateColor
+import androidx.compose.animation.core.*
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.GridCells
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -43,6 +47,7 @@ import com.google.accompanist.insets.statusBarsPadding
 //import com.google.accompanist.insets.LocalWindowInsets
 //import com.google.accompanist.insets.ProvideWindowInsets
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.istir.weebtoolscompose.ui.theme.WeebToolsComposeTheme
 import java.io.File
 
@@ -65,7 +70,7 @@ class MainActivity : ComponentActivity() {
 //        )
 //        Log.i("cover", "$cover")
 //        pickedFolder = getFolderFromCache()
-        mangaViewModel.pickedFolder = getFolderFromCache().toString()
+        mangaViewModel.pickedFolder = getFolderFromCache(mangaViewModel).toString()
 //        val db = DBHelper(applicationContext, null)
 
 
@@ -76,25 +81,46 @@ class MainActivity : ComponentActivity() {
                 mangaViewModel.initDatabase(applicationContext)
 
             }
-//            val systemUIController = rememberSystemUiController()
-//            systemUIController.setSystemBarsColor(Color.Transparent)
+            val systemUIController = rememberSystemUiController()
+
 
             ProvideWindowInsets() {
                 WeebToolsComposeTheme(isSystemInDarkTheme()) {
                     val decayAnimationSpec = rememberSplineBasedDecay<Float>()
                     val scrollBehavior = remember(decayAnimationSpec) {
+//                        val d =  decayAnimationSpec(f:Float) {
+//
+//                    }
+//                        val decayAnimationSpec = DecayAnimationSpec(f:Float) {
+//
+//                        }
                         TopAppBarDefaults.exitUntilCollapsedScrollBehavior(decayAnimationSpec)
+//                        CollapsingToolbarLayout(applicationContext,)
+//                        TopAppBarDefaults.pinnedScrollBehavior(true)
                     }
+//val topAppBarColors = TopAppBarColors.containerColor(scrollFraction = 0f)
+//                  val topAppBarColors = object :TopAppBarColors {
+//
+//                  }
+                    val c = TopAppBarDefaults.mediumTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        scrolledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        navigationIconContentColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.primary,
+                        actionIconContentColor = MaterialTheme.colorScheme.primary,
 
+                        )
 
-
+                    systemUIController.setSystemBarsColor(MaterialTheme.colorScheme.primaryContainer)
+                    val scrollBehavior1 = remember { TopAppBarDefaults.pinnedScrollBehavior() }
+                    val scrollBehavior2 = remember { TopAppBarDefaults.enterAlwaysScrollBehavior() }
                     Scaffold(
                         modifier = Modifier
-                            .nestedScroll(scrollBehavior.nestedScrollConnection)
+                            .nestedScroll(scrollBehavior2.nestedScrollConnection)
                             .statusBarsPadding(),
                         topBar = {
                             MediumTopAppBar(
-                                title = { Text("Medium TopAppBar") },
+                                title = { Text("weebTools") },
                                 navigationIcon = {
                                     IconButton(onClick = { /* doSomething() */ }) {
                                         Icon(
@@ -112,10 +138,15 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                 },
-                                scrollBehavior = scrollBehavior,
+//colors = TopAppBarColors.,
+                                colors = c,
+                                scrollBehavior = scrollBehavior2,
 
+//                                modifier = Modifier
+//                                    .padding(0.dp)
+//                                    .padding(0.dp, 100.dp, 0.dp, 0.dp)
 
-                                )
+                            )
                         }, content = { innerPadding ->
 
 //                                items()
@@ -148,7 +179,7 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    private fun getFolderFromCache(): Uri? {
+    private fun getFolderFromCache(mangaViewModel: MangaViewModel): Uri? {
         val sharedPreferences: SharedPreferences = this.getPreferences(Context.MODE_PRIVATE);
         val defaultValue = resources.getString(R.string.pickedMangaFolder)
         val folderUri =
@@ -158,11 +189,21 @@ class MainActivity : ComponentActivity() {
 //        if (folderUri != null) {
 //            Log.i("getFolderfromCache", folderUri)
 //        }
-        if (folderUri != "NULL") return Uri.parse(folderUri)
-        return null;
+//        if (folderUri != "NULL") return Uri.parse(folderUri)
+//        return setupSimpleStorage(mangaViewModel = mangaViewModel)
+        if (folderUri == "NULL") {
+            setupSimpleStorage(mangaViewModel)
+//            Log.i("PICKED", "${mangaViewModel.pickedFolder}")
+            return Uri.parse(mangaViewModel.pickedFolder)
+        } else {
+            return Uri.parse(folderUri)
+        }
+//        return null;
     }
 
     private fun setupSimpleStorage(mangaViewModel: MangaViewModel) {
+//        var selected: Uri? = null
+
         storageHelper.onFolderSelected = { requestCode: Int, folder: DocumentFile ->
             Toast.makeText(baseContext, "Selected: ${folder.name}", Toast.LENGTH_LONG).show()
 //            pickedFolder = folder
@@ -173,10 +214,15 @@ class MainActivity : ComponentActivity() {
 //            mangaViewModel.initDatabase(applicationContext)
             addFolderToCache(folder)
 //            populateList(folder)
+//            selected = folder.uri
+
+
         }
 
 //        storageHelper.requestStorageAccess()
         storageHelper.openFolderPicker()
+//        return getFolderFromCache(mangaViewModel)
+//        return selected
     }
 
 }
@@ -202,17 +248,25 @@ class MainActivity : ComponentActivity() {
 //
 //}
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MangaList(mangaViewModel: MangaViewModel, innerPadding: PaddingValues) {
     val sorted = mangaViewModel.mangas.sortedByDescending { it.modifiedAt }
 //    if (LocalWindowInsets.current.systemBars.top > 0) {
-    LazyColumn(
+
+
+    LazyVerticalGrid(
         contentPadding = innerPadding,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+//        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+
+        cells = GridCells.Fixed(2),
+        modifier = Modifier.padding(8.dp, 0.dp)
     ) {
         items(sorted.size) {
             MangaListItem(manga = sorted[it])
         }
+
         /*
 //            Log.i("STATUS BAR", "${LocalWindowInsets.current.systemBars.top}")
 
@@ -285,56 +339,110 @@ fun MangaList(mangaViewModel: MangaViewModel, innerPadding: PaddingValues) {
 fun MangaListItem(manga: Manga) {
     val context1 = LocalContext.current
 
+    Box(Modifier.padding(0.dp, 4.dp)) {
+        ElevatedCard(modifier = Modifier
+            .clickable {
+                val intent = Intent(context1, MangaViewFullscreenActivity::class.java)
+                intent.putExtra("mangaUri", manga.uri.toString())
+                intent.putExtra("mangaName", manga.name)
+                context1.startActivity(intent)
+            }
+            .height(300.dp)
+        ) {
+//            if (manga.pages == -1) {
+////                Box(
+////                    Modifier
+////                        .fillMaxSize()
+////                        .background(Color.Transparent)) {
+////                CircularProgressIndicator(
+//////                    Modifier.fillMaxSize()
+////                )
+////                }
+//            }
 
-    ElevatedCard(modifier = Modifier.clickable {
-        val intent = Intent(context1, MangaViewFullscreenActivity::class.java)
-        intent.putExtra("mangaUri", manga.uri.toString())
-        intent.putExtra("mangaName", manga.name)
-        context1.startActivity(intent)
-    }) {
-        if (manga.pages == -1) {
-            CircularProgressIndicator(
-            )
+            Column(verticalArrangement = Arrangement.SpaceBetween) {
+//                Box(Modifier.wei)
+                MangaThumbnail(image = manga.image)
+//                Spacer(Modifier.size(5.dp))
+                MangaDescription(manga = manga)
+            }
         }
+    }
+}
 
-        if (manga.image != null && manga.image != "") {
-            Log.i("MANGAIMAGE", "${manga.image}")
+@Composable
+fun ShimmerAnimation(transition: InfiniteTransition) {
+    val a by transition.animateColor(
+        initialValue = MaterialTheme.colorScheme.primary,
+        targetValue = MaterialTheme.colorScheme.primaryContainer,
+        animationSpec = infiniteRepeatable(
+            tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse
+        )
+    )
+
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+//                .size(250.dp)
+            .background(a)
+    ) {
+        CircularProgressIndicator(
+            Modifier.align(Alignment.Center),
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    }
+}
+
+
+@Composable
+fun ColumnScope.MangaDescription(manga: Manga) {
+    Box(Modifier.padding(8.dp)) {
+        Column() {
+            Text(text = manga.name)
+            val text =
+                if (manga.pages != -1) "${manga.currentPosition}/${manga.pages}" else "Loading..."
+            Text(text = text)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ColumnScope.MangaThumbnail(image: String) {
+    ElevatedCard(
+        Modifier
+            .weight(1f)
+            .padding(8.dp)
+    ) {
+        if (image != null && image != "") {
+//        Log.i("MANGAIMAGE", "${image}")
             var bitmap: ImageBitmap? = null
             try {
-                bitmap = BitmapFactory.decodeFile(manga.image).asImageBitmap()
+                bitmap = BitmapFactory.decodeFile(image).asImageBitmap()
 
             } catch (e: Exception) {
                 e.printStackTrace()
             }
             if (bitmap != null) {
-                Image(bitmap = bitmap, contentDescription = "cover")
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = "cover",
+                    contentScale = ContentScale.Crop,
+//                modifier=Modifier.size
+                    modifier = Modifier.fillMaxHeight()
+                )
+
             }
+        } else {
+            ShimmerAnimation(
+                rememberInfiniteTransition()
+            )
         }
-
-        Text(text = manga.name)
     }
-
 }
 
-@Composable
-fun MangaListItem(uri: Uri, name: String) {
-    val context1 = LocalContext.current
-    Button(
-        onClick = {
-            val intent = Intent(context1, MangaViewFullscreenActivity::class.java)
-            intent.putExtra("mangaUri", uri.toString())
-            intent.putExtra("mangaName", name)
-            context1.startActivity(intent)
-        },
-        Modifier
-            .fillMaxWidth()
-            .padding(15.dp)
-
-    ) {
-        Text(text = name)
-    }
-
-}
 
 @Composable
 fun ChooseFolderButton(onClick: () -> Unit) {

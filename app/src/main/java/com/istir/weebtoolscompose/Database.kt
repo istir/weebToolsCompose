@@ -68,29 +68,31 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         Log.i("checkIfMangaExists", "${cursor}")
         if (cursor != null) {
             Log.i("checkIfMangaExists", "not null")
-            cursor.moveToFirst()
+            if (db.isOpen) {
+                cursor.moveToFirst()
 
-            return try {
-                val a = cursor.getInt(cursor.getColumnIndexOrThrow(ID_COL))
-                Log.i(
-                    "checkIfMangaExists",
-                    "return try, ${a}"
-                )
+                return try {
+                    val a = cursor.getInt(cursor.getColumnIndexOrThrow(ID_COL))
+                    Log.i(
+                        "checkIfMangaExists",
+                        "return try, ${a}"
+                    )
 
-                true
-            } catch (e: Exception) {
-                Log.i(
-                    "checkIfMangaExists",
-                    "exception $e"
-                )
-                false
-            }
+                    true
+                } catch (e: Exception) {
+                    Log.i(
+                        "checkIfMangaExists",
+                        "exception $e"
+                    )
+                    false
+                }
+            } else false
 
 //                mangas.add(createManga(cursor = cursor))
 
 
         }
-        db.close()
+        //db.close()
         return false
     }
 
@@ -136,7 +138,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         values.put(IMAGEURI_COL, imageUri)
         val db = this.writableDatabase
         val id = db.insert(TABLE_NAME, null, values)
-        db.close()
+        //db.close()
         Log.i("ID", "${id}")
         if (id > 0) {
             return Manga(
@@ -171,7 +173,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 //            e.printStackTrace()
 //        }
 
-        db.close()
+        //db.close()
     }
 
     fun editMangaModified(originalName: String, originalUri: Uri, newModified: Long) {
@@ -202,7 +204,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 //                    )
 //                }' AND $URI_COL = '$originalUri'"
 //            )
-//            db.close()
+//            //db.close()
             val values = ContentValues()
             values.put(IMAGEURI_COL, newCover.toString())
             updateMangaByUriAndName(values, originalUri, originalName)
@@ -219,7 +221,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 //                    )
 //                }' AND $URI_COL = '$originalUri'"
 //            )
-//            db.close()
+//            //db.close()
             val values = ContentValues()
             values.put(URI_COL, newUri.toString())
             updateMangaByUriAndName(values, originalUri, originalName)
@@ -239,7 +241,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
             val values = ContentValues()
             values.put(ISDELETED_COL, if (newDeleted) 1 else 0)
             updateMangaByUriAndName(values, originalUri, originalName)
-//            db.close()
+//            //db.close()
         }
     }
 
@@ -252,7 +254,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
             values.put(NAME_COL, newName)
             updateMangaByUriAndName(values, originalUri, originalName)
 //            db.update(TABLE_NAME, values, whereClause, whereArgs)
-//            db.close()
+//            //db.close()
         }
     }
 
@@ -285,7 +287,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 //        } while (cursor.moveToNext())
 
         }
-        db.close()
+        //db.close()
         return progress
     }
 
@@ -346,7 +348,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 
         val db = this.writableDatabase
         db.update(TABLE_NAME, newValues, whereClause, whereArgs)
-        db.close()
+        //db.close()
 
     }
 
@@ -357,7 +359,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
-            db.close()
+            //db.close()
         }
     }
 
@@ -368,7 +370,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
-            db.close()
+            //db.close()
         }
     }
 
@@ -459,7 +461,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
             } while (cursor.moveToNext())
 
         }
-        db.close()
+        //db.close()
         return mangas
     }
 
@@ -484,7 +486,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
             } while (cursor.moveToNext())
 
         }
-        db.close()
+        //db.close()
         return mangas
     }
 
@@ -506,7 +508,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 
 //            mangas.add()
         }
-        db.close()
+        //db.close()
         return mangas
     }
 
@@ -528,7 +530,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 
 //            mangas.add()
         }
-        db.close()
+        //db.close()
         for (manga in mangas) {
             Log.i("mangas without pages", manga.toString())
         }
@@ -554,7 +556,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 
 //            mangas.add()
         }
-        db.close()
+        //db.close()
         return mangas
     }
 
@@ -576,7 +578,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 
 //            mangas.add()
         }
-        db.close()
+        //db.close()
         return mangas
     }
 
@@ -597,7 +599,7 @@ class DBHelper(context: Context, factory: SQLiteDatabase.CursorFactory?) :
 
 //            mangas.add()
         }
-        db.close()
+        //db.close()
         return mangas
 //        db.query(table= TABLE_NAME,)
     }

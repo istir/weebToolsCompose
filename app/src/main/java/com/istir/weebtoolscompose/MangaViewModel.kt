@@ -70,9 +70,24 @@ class MangaViewModel : ViewModel() {
 
 //        var m = mangas.find { manga -> manga.id == mangaToModify.id }
 //        m = mangaToModify
-        val index = mangas.indexOfFirst { it.id == mangaToModify.id }
+        Log.i("MANGA TO MODIFY", "${mangaToModify}")
+//        if (mangaToModify.id != null) {
+//            val index = mangas.indexOfFirst { it.id == mangaToModify.id }
+//            if (index > 0)
+//                mangas[index] = mangaToModify
+//        } else {
+        val index = mangas.indexOfFirst {
+            Log.i("modifying", "it: ${it}, modify:${mangaToModify}")
+            if (it.id != null) {
+                it.id == mangaToModify.id
+            } else {
+                it.uri == mangaToModify.uri
+            }
+        }
         if (index > 0)
             mangas[index] = mangaToModify
+//        }
+
     }
 
     fun removeManga(item: Manga) {
@@ -110,31 +125,35 @@ class MangaViewModel : ViewModel() {
         Log.i("METADATA?????????", "$mangas")
         viewModelScope.launch {
 //            for (manga in mangas) {
-            mangas.map {
-                Log.i("pages", "${it.pages}")
+            try {
+                mangas.map {
+                    Log.i("pages", "${it.pages}")
 //                if (manga.pages == -1) {
-                async(Dispatchers.IO) {
-                    val pageCount = getZipSize(context.contentResolver, it.uri)
-                    val cover = getCoverImage(
-                        context,
-                        context.contentResolver,
-                        it.uri,
-                        it.id.toString()
-                    )
-                    Log.i("COVER", cover.toString())
-                    dbHelper.editMangaCover(it.name, it.uri, cover)
-//                    dbHelper.editMangaPages(it.uri, pageCount)
-                    removeManga(it)
+                    async(Dispatchers.IO) {
+                        val pageCount = getZipSize(context.contentResolver, it.uri)
+                        val cover = getCoverImage(
+                            context,
+                            context.contentResolver,
+                            it.uri,
+                            it.id.toString()
+                        )
+                        Log.i("COVER", cover.toString())
+                        dbHelper.editMangaCover(it.name, it.uri, cover)
+                        dbHelper.editMangaPages(it.uri, pageCount)
+//                    removeManga(it)
 //                    val newManga = it
-                    it.image = cover
-                    it.pages = pageCount
+                        it.image = cover
+                        it.pages = pageCount
 //                    addManga(it)
 //                    Log.i("PAGES", "forsenDespair ...")
-                    editManga(it)
+                        editManga(it)
 //                    removeMangaAt(2)
 //                    Log.i("it", "${it.toString()}")
-                }
-            }.awaitAll()
+                    }
+                }.awaitAll()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
 //            Log.i("AWAITED", "ALL")
         }
 //            this.cancel()
@@ -211,7 +230,7 @@ class MangaViewModel : ViewModel() {
                     val folder = DocumentFile.fromTreeUri(context, Uri.parse(pickedFolder))
                     Log.i("initDatabase", "folder:$folder, uri: $pickedFolder")
                     folder?.listFiles()?.let {
-
+                        val newlyAddedMangas = ArrayList<Manga>()
                         for (item in it) {
 //                if(item.mimeType)
 //                Log.i("MIME", "${item.mimeType}, ${item.name}")
@@ -228,11 +247,15 @@ class MangaViewModel : ViewModel() {
                                         it1, ""
 
                                     )
-                                        ?.let { it1 -> addManga(it1) }
+                                        ?.let { it1 ->
+                                            addManga(it1)
+                                            newlyAddedMangas.add(it1)
+//                                            getMetadata(context, arrayListOf(it1))
+                                        }
                                 }
                             }
                         }
-
+                        getMetadata(context, newlyAddedMangas)
                         for (item in dbHelper.getExistingMangasInFolder(Uri.parse(pickedFolder))) {
                             Log.i("MANGA", item.toString())
 //                            dbHelper.editManga(item.name, item.uri, "TESTINGTESTING")
